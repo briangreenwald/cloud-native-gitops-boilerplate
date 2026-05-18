@@ -1,16 +1,3 @@
 liferay-default:
     image:
         tag: 2025.q1.20-lts
-
-    customEnv:
-        x-jmx_metrics:
-            - name: JMX_AGENT_PORT
-              value: "12345"
-            - name: JMX_AGENT_YAML
-              value: |
-                  includeObjectNames: ["com.liferay.users.admin:*"]
-                  rules:
-                  - name: server_live_users
-                    pattern: ^com.liferay.users.admin<classification=live_users, name=LiveUsers><>ServerLiveUsersCount
-                    type: GAUGE
-                  - pattern: ".*"
