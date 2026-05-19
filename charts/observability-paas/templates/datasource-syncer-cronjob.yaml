@@ -1,0 +1,22 @@
+{{- if .Values.jobs.gcpDatasourceSyncer.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+    labels:
+        {{- include "observability-paas.labels" . | nindent 8 }}
+    name: {{ include "observability-paas.datasourceSyncer.fullname" . | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    concurrencyPolicy: {{ .Values.jobs.gcpDatasourceSyncer.concurrencyPolicy | quote }}
+    jobTemplate:
+        metadata:
+            {{- with .Values.jobs.gcpDatasourceSyncer.annotations }}
+            annotations:
+                {{- toYaml . | nindent 16 }}
+            {{- end }}
+            labels:
+                {{- include "observability-paas.labels" . | nindent 16 }}
+        spec:
+            {{- include "observability-paas.datasourceSyncer.podTemplate" . | nindent 12 }}
+    schedule: {{ .Values.jobs.gcpDatasourceSyncer.schedule | quote }}
+{{- end }}

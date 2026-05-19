@@ -1,0 +1,70 @@
+{{- $folder := .Values.dashboards.folder -}}
+{{- $datasourceUid := include "observability.datasourceUid" . -}}
+{{- $namespace := include "observability.namespace" . -}}
+{{- $items := deepCopy .Values.dashboards.items -}}
+{{- if eq .Values.logs.backend "cloud-logging" -}}
+{{- $_ := set $items "kubernetes-workload-logs" (dict "file" "dashboards/logs/cloud-logging-kubernetes-logs.json") -}}
+{{- else if eq .Values.logs.backend "cloudwatch" -}}
+{{- $_ := set $items "kubernetes-workload-logs" (dict "file" "dashboards/logs/cloudwatch-kubernetes-logs.json") -}}
+{{- end -}}
+{{/*
+Pre-compute the central-hub external-system tile substitutions. The hub HTML
+contains literal ${argocd_href}, ${argocd_description}, ${argocd_tile_style},
+${argo_workflows_href}, ${argo_workflows_description},
+${argo_workflows_tile_style} placeholders that we swap below. URL is required
+when the tile is "active"; when the URL value is empty the tile renders as a
+muted placeholder pointing the operator at the relevant values key.
+*/}}
+{{- $activeTileStyle := "background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; text-decoration: none; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;" -}}
+{{- $mutedTileStyle := "background-color: #f9fafb; border: 1px dashed #d1d5db; border-radius: 10px; padding: 16px; text-decoration: none; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; opacity: 0.65;" -}}
+{{- $argocdHref := "#" -}}
+{{- $argocdDescription := "Set centralHub.argocdUrl in your values.yaml to enable this link." -}}
+{{- $argocdTileStyle := $mutedTileStyle -}}
+{{- if .Values.centralHub.argocdUrl -}}
+{{- $argocdHref = .Values.centralHub.argocdUrl -}}
+{{- $argocdDescription = "GitOps & Delivery." -}}
+{{- $argocdTileStyle = $activeTileStyle -}}
+{{- end -}}
+{{- $argoWfHref := "#" -}}
+{{- $argoWfDescription := "Set centralHub.argoWorkflowsUrl in your values.yaml to enable this link." -}}
+{{- $argoWfTileStyle := $mutedTileStyle -}}
+{{- if .Values.centralHub.argoWorkflowsUrl -}}
+{{- $argoWfHref = .Values.centralHub.argoWorkflowsUrl -}}
+{{- $argoWfDescription = "Workflow automation." -}}
+{{- $argoWfTileStyle = $activeTileStyle -}}
+{{- end -}}
+{{- range $key, $entry := $items }}
+{{- if not (eq $entry.enabled false) }}
+{{- $raw := $.Files.Get $entry.file -}}
+{{- if not $raw -}}
+{{- fail (printf "Dashboard file %s not found in chart" $entry.file) -}}
+{{- end -}}
+{{- $rendered := $raw | replace "${DS_PROMETHEUS}" $datasourceUid -}}
+{{- if eq $key "central-hub" -}}
+{{- if not $.Values.centralHub.gitUrl -}}
+{{- fail "centralHub.gitUrl is required when the central-hub dashboard is enabled. Set it in your values.yaml or disable the dashboard via dashboards.items.central-hub.enabled: false." -}}
+{{- end -}}
+{{- $rendered = $rendered | replace "${git_url}" $.Values.centralHub.gitUrl -}}
+{{- $rendered = $rendered | replace "${argocd_href}" $argocdHref -}}
+{{- $rendered = $rendered | replace "${argocd_description}" $argocdDescription -}}
+{{- $rendered = $rendered | replace "${argocd_tile_style}" $argocdTileStyle -}}
+{{- $rendered = $rendered | replace "${argo_workflows_href}" $argoWfHref -}}
+{{- $rendered = $rendered | replace "${argo_workflows_description}" $argoWfDescription -}}
+{{- $rendered = $rendered | replace "${argo_workflows_tile_style}" $argoWfTileStyle -}}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    annotations:
+        grafana_folder: {{ $folder | quote }}
+    labels:
+        {{- include "observability.labels" $ | nindent 8 }}
+        grafana_dashboard: "true"
+    name: {{ printf "%s-dashboard-%s" (include "observability.fullname" $) $key | trunc 63 | trimSuffix "-" | quote }}
+    namespace: {{ $namespace | quote }}
+data:
+    {{ $key }}.json: |
+        {{- $rendered | nindent 8 }}
+{{- end }}
+{{- end }}

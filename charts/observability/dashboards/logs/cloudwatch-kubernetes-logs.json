@@ -1,0 +1,253 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Kubernetes Workloads (Metrics)",
+      "tooltip": "Back to the main Kubernetes Workloads dashboard",
+      "type": "link",
+      "url": "/d/kubernetes-workloads/kubernetes-workloads"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "panels": [],
+      "title": "Liferay Logs",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "liferay-cloudwatch-logs"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "dedupStrategy": "exact",
+        "detailsMode": "inline",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "fontSize": "default",
+        "prettifyLogMessage": false,
+        "showControls": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "syntaxHighlighting": true,
+        "timestampResolution": "ms",
+        "unwrappedColumns": false,
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "liferay-cloudwatch-logs"
+          },
+          "expression": "fields @timestamp, @message, kubernetes.namespace_name, kubernetes.pod_name, kubernetes.container_name\n| filter kubernetes.namespace_name = \"$environment\"\n| filter kubernetes.pod_name like /liferay-.*/\n| sort @timestamp desc\n| limit 1000",
+          "id": "",
+          "logGroups": [
+            {
+              "name": "$log_group",
+              "arn": "$log_group"
+            }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "default",
+          "statsGroups": []
+        }
+      ],
+      "title": "Liferay Logs",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 101,
+      "panels": [],
+      "title": "Search Logs",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "liferay-cloudwatch-logs"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 16,
+      "options": {
+        "dedupStrategy": "exact",
+        "detailsMode": "inline",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "fontSize": "default",
+        "prettifyLogMessage": false,
+        "showControls": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "syntaxHighlighting": true,
+        "timestampResolution": "ms",
+        "unwrappedColumns": false,
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "liferay-cloudwatch-logs"
+          },
+          "expression": "fields @timestamp, @message, kubernetes.namespace_name, kubernetes.pod_name, kubernetes.container_name\n| filter kubernetes.namespace_name = \"$environment-elasticsearch\"\n| sort @timestamp desc\n| limit 1000",
+          "id": "",
+          "logGroups": [
+            {
+              "name": "$log_group",
+              "arn": "$log_group"
+            }
+          ],
+          "queryMode": "Logs",
+          "refId": "A",
+          "region": "default",
+          "statsGroups": []
+        }
+      ],
+      "title": "Search Logs",
+      "type": "logs"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 42,
+  "tags": [
+    "liferay",
+    "logs",
+    "aws"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+        "label": "Environment",
+        "name": "environment",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "/(?<value>.*-(?<text>.*))/",
+        "regexApplyTo": "value",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "/aws/containerinsights/$cluster/application",
+          "value": "/aws/containerinsights/$cluster/application"
+        },
+        "description": "CloudWatch Logs log group containing Kubernetes container logs",
+        "hide": 0,
+        "label": "Log Group",
+        "name": "log_group",
+        "options": [
+          {
+            "selected": true,
+            "text": "/aws/containerinsights/$cluster/application",
+            "value": "/aws/containerinsights/$cluster/application"
+          }
+        ],
+        "query": "/aws/containerinsights/$cluster/application",
+        "type": "textbox"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "liferay-cloudwatch-logs"
+        },
+        "description": "",
+        "filters": [],
+        "hide": 0,
+        "name": "Filters",
+        "type": "adhoc"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Kubernetes Workload Logs (AWS CloudWatch)",
+  "uid": "kubernetes-workload-logs-aws",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,0 +1,12 @@
+{{- if .Values.jobs.gcpDatasourceSyncer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        {{- include "observability-paas.labels" . | nindent 8 }}
+    name: {{ printf "%s-script" (include "observability-paas.datasourceSyncer.fullname" .) | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+data:
+    datasource-syncer.sh: |
+        {{- include "observability-paas.scripts.datasource-syncer" . | nindent 8 }}
+{{- end }}

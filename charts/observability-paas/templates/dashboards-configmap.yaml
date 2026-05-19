@@ -1,0 +1,38 @@
+{{- $folder := .Values.dashboards.folder -}}
+{{- $datasourceUid := index .Values "observability" "datasource" "uid" | default "managed-prometheus" -}}
+{{- $namespace := include "observability-paas.namespace" . -}}
+{{/*
+PaaS-side central-hub substitutions. The HTML contains literal ${...}
+placeholders that map to chart values; the templatePatch in the ArgoCD
+ApplicationSet fills these from cluster metadata at deploy time.
+*/}}
+{{- $ch := .Values.centralHub -}}
+{{- range $key, $entry := .Values.dashboards.items }}
+{{- if not (eq $entry.enabled false) }}
+{{- $raw := $.Files.Get $entry.file -}}
+{{- if not $raw -}}
+{{- fail (printf "Dashboard file %s not found in chart" $entry.file) -}}
+{{- end -}}
+{{- $rendered := $raw | replace "${DS_PROMETHEUS}" $datasourceUid -}}
+{{- if eq $key "central-hub" -}}
+{{- $rendered = $rendered | replace "${git_url}" $ch.gitUrl -}}
+{{- $rendered = $rendered | replace "${dns_zone}" $ch.dnsZone -}}
+{{- $rendered = $rendered | replace "${project_slug}" $ch.projectLabel -}}
+{{- $rendered = $rendered | replace "${location}" $ch.locationLabel -}}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    annotations:
+        grafana_folder: {{ $folder | quote }}
+    labels:
+        {{- include "observability-paas.labels" $ | nindent 8 }}
+        grafana_dashboard: "true"
+    name: {{ printf "%s-dashboard-%s" (include "observability-paas.fullname" $) $key | trunc 63 | trimSuffix "-" | quote }}
+    namespace: {{ $namespace | quote }}
+data:
+    {{ $key }}.json: |
+        {{- $rendered | nindent 8 }}
+{{- end }}
+{{- end }}

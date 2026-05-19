@@ -1,0 +1,459 @@
+# -- Cloud provider this chart is being installed onto.
+# Must be set to one of: aws | gcp.
+# Switches the Grafana Prometheus datasource auth and the scrape-config CRDs.
+cloudProvider: ""
+
+# -- Custom labels merged onto every resource this chart renders.
+customLabels: {}
+
+# -- Optional override for the resource name prefix.
+fullnameOverride: ""
+nameOverride: ""
+namespaceOverride: ""
+
+# -- AWS-specific configuration. Required when cloudProvider=aws.
+aws:
+    # -- AWS region the AMP workspace lives in.
+    region: ""
+    # -- AMP workspace URL. The full Prometheus query endpoint, e.g.
+    # https://aps-workspaces.<region>.amazonaws.com/workspaces/<workspace-id>
+    ampWorkspaceUrl: ""
+
+# -- GCP-specific configuration. Required when cloudProvider=gcp.
+gcp:
+    # -- GCP project ID hosting the GMP workspace.
+    projectId: ""
+
+# -- Central Hub dashboard configuration. The hub's left-hand panel renders
+# tiles that link out to external systems (the customer's Git repo, ArgoCD,
+# Argo Workflows). URLs are substituted into the dashboard JSON at chart-
+# render time. gitUrl is required; argocdUrl and argoWorkflowsUrl are
+# optional. When an optional URL is empty, its tile renders as a muted
+# "configure me" placeholder with text pointing the operator at this values
+# key.
+centralHub:
+    # -- Customer Git repository URL. Required when the central-hub dashboard
+    # is enabled. helm template/install fails fast if empty.
+    gitUrl: ""
+    # -- ArgoCD URL. Optional. Tile renders as a placeholder when unset.
+    argocdUrl: ""
+    # -- Argo Workflows URL. Optional. Tile renders as a placeholder when
+    # unset. Self-hosted uses Argo Workflows for backup/restore flows.
+    argoWorkflowsUrl: ""
+
+# -- Datasource the universal dashboards and alert rules query against.
+# The UID is referenced from every dashboard JSON and every alert rule,
+# so do not change `uid` after installation unless you also update the
+# dashboards.
+datasource:
+    name: Prometheus
+    uid: managed-prometheus
+    # -- Grafana datasource type. Override only if pointing at a non-Prometheus
+    # backend; the dashboards expect PromQL.
+    type: prometheus
+
+# -- Optional log backend. The chart ships a metrics-only "kubernetes-workloads"
+# dashboard plus, optionally, a separate "kubernetes-workload-logs" dashboard
+# whose panel queries match the configured backend.
+#
+# Supported backends:
+#   "cloud-logging" — GCP Cloud Logging via the googlecloud-logging-datasource
+#                     plugin. Requires that plugin to be installed; set
+#                     `grafana.plugins: [googlecloud-logging-datasource]` in
+#                     your values (observability-paas does this automatically).
+#   "cloudwatch"    — AWS CloudWatch Logs Insights via Grafana's built-in
+#                     cloudwatch datasource. No plugin install required. The
+#                     pod logs must already be shipped to CloudWatch (e.g. via
+#                     Fluent Bit, the CloudWatch Container Insights add-on, or
+#                     the AWS for Fluent Bit chart).
+#   ""              — log dashboards are not rendered. Default for self-hosted
+#                     installs that haven't wired up log aggregation yet.
+logs:
+    backend: ""
+    cloudLogging:
+        # -- Filter applied to the Cloud Logging datasource's log bucket scope.
+        # Matches the existing PaaS behaviour. Override per cluster if your
+        # log buckets follow a different naming scheme.
+        logBucketFilter: ".*workspace"
+    cloudwatch:
+        # -- AWS region the CloudWatch log groups live in. Required when
+        # backend=cloudwatch.
+        region: ""
+        # -- Authentication chain. "default" uses the AWS SDK default chain
+        # (respects IRSA on EKS). Set to "keys" + accessKey/secretKey for
+        # static credentials; not recommended.
+        authType: default
+        # -- IAM role to assume, if not using the pod's IRSA role directly.
+        assumeRoleArn: ""
+
+# -- Grafana Alloy is the unified scraper across all clouds. The chart owns
+# Alloy's ServiceAccount and ConfigMap; the alloy subchart consumes them via
+# static names (liferay-alloy / liferay-alloy-config). One Alloy install per
+# namespace.
+alloy:
+    enabled: true
+    # -- Scrape interval applied to every prometheus.scrape block in the
+    # generated River config. Override per-target if needed.
+    scrapeInterval: 1m
+    # -- IAM identity wiring. Populate the value matching your cloud:
+    #   aws  -> eks.amazonaws.com/role-arn annotation on Alloy's SA (IRSA).
+    #   gcp  -> iam.gke.io/gcp-service-account annotation (Workload Identity).
+    # The IAM role / GCP service account themselves live outside the chart
+    # (operator-provisioned via terraform / cloud-infrastructure tooling).
+    iam:
+        awsRoleArn: ""
+        gcpServiceAccount: ""
+    # -- Scrape targets. Each renders a discovery + relabel + scrape block in
+    # the Alloy River config. Disable a target by setting enabled: false.
+    scrape:
+        kubeStateMetrics:
+            enabled: true
+            port: http
+            path: /metrics
+        cadvisor:
+            enabled: true
+            path: /metrics/cadvisor
+        nodeExporter:
+            enabled: true
+            port: metrics
+            path: /metrics
+        pushgateway:
+            enabled: true
+            port: http
+            path: /metrics
+        liferay:
+            # -- Scrape Liferay application pods (JMX-exposed Prometheus
+            # metrics on port 12345). Needed for the JVM panels in the
+            # databases / kubernetes-workloads dashboards.
+            enabled: true
+            matchLabels:
+                component: liferay
+            port: 12345
+            path: /metrics
+    # -- Remote-write destination. Cloud-specific blocks are auto-generated:
+    #   cloudProvider=aws  -> sigv4 against aws.ampWorkspaceUrl
+    #   cloudProvider=gcp  -> bearer-token against gcp GMP write endpoint
+    #                          (Workload Identity provides the token)
+    #   cloudProvider=""   -> requires remoteWrite.url + one of basicAuth /
+    #                          bearerToken / none
+    remoteWrite:
+        url: ""
+        basicAuth:
+            username: ""
+            password: ""
+        bearerToken: ""
+        headers: {}
+        externalLabels: {}
+
+# -- Subchart pass-through for the aliased grafana alloy chart. The chart
+# owns the SA and ConfigMap; the subchart only renders the DaemonSet + RBAC.
+# Operator-relevant alloy.* values live above; this block is mostly
+# implementation detail.
+grafanaAlloy:
+    alloy:
+        configMap:
+            create: false
+            key: config.alloy
+            name: liferay-alloy-config
+    controller:
+        type: daemonset
+    serviceAccount:
+        create: false
+        name: liferay-alloy
+
+# -- Universal alerting configuration. The PaaS overlay adds more rules on top.
+alerting:
+    # -- Default Grafana folder for the rules in this chart.
+    folder: alerts
+    # -- Default group evaluation interval.
+    interval: 1m
+    # -- Alert rules ship default-enabled. Set <name>.enabled=false to drop one.
+    # Each entry becomes one ConfigMap consumed by the Grafana alerting sidecar.
+    rules:
+        cpu-limit-utilization:
+            title: "Container CPU Limit Utilization Above 80%"
+            expr: |
+                avg_over_time(liferay:container_cpu_limit_utilization:ratio{namespace=~"liferay-.*-.*"}[2m]) > 0.8
+            interval: 2m
+            labels:
+                aggregation_period: 2m
+                type: warning
+                unit: percent
+        memory-limit-utilization:
+            title: "Container Memory Limit Utilization Above 80%"
+            expr: |
+                avg_over_time(liferay:container_memory_limit_utilization:ratio{namespace=~"liferay-.*-.*"}[2m]) > 0.8
+            interval: 2m
+            labels:
+                aggregation_period: 2m
+                type: warning
+                unit: percent
+        frequent-pod-restarts:
+            title: "High Rate of Pod Restarts Detected"
+            expr: |
+                sum by (container, namespace, pod) (
+                    increase(kube_pod_container_status_restarts_total[30m])
+                ) > 3
+                and on(namespace)
+                label_replace(
+                    kube_namespace_labels{label_project_customer="yes"},
+                    "namespace", "$1", "exported_namespace", "(.*)"
+                )
+            labels:
+                aggregation_period: 30m
+                type: warning
+                unit: occurrences
+        zero-ready-replicas:
+            title: "Deployment or StatefulSet with Zero Ready Replicas"
+            expr: |
+                (
+                    max_over_time(kube_deployment_status_replicas_ready[10m]) == 0
+                    or
+                    max_over_time(kube_statefulset_status_replicas_ready[10m]) == 0
+                )
+            labels:
+                aggregation_period: 10m
+                type: critical
+                unit: state
+    # -- Recording rules normalize the per-container utilization math so the
+    # alert exprs above stay short. Always rendered (no enabled toggle).
+    recordingRules:
+        container-cpu-limit-utilization-ratio:
+            record: liferay:container_cpu_limit_utilization:ratio
+            expr: |
+                sum by (container, namespace, pod) (
+                    rate(container_cpu_usage_seconds_total{container!="", container!="POD"}[5m])
+                )
+                /
+                sum by (container, namespace, pod) (
+                    kube_pod_container_resource_limits{resource="cpu"}
+                )
+        container-memory-limit-utilization-ratio:
+            record: liferay:container_memory_limit_utilization:ratio
+            expr: |
+                sum by (container, namespace, pod) (
+                    container_memory_working_set_bytes{container!="", container!="POD"}
+                )
+                /
+                sum by (container, namespace, pod) (
+                    kube_pod_container_resource_limits{resource="memory"}
+                )
+    # -- The receiver that catches everything that doesn't match a route below.
+    # Must reference a key in `notificationChannels`. Required when alerting is
+    # rendered (i.e. when notificationChannels is non-empty).
+    defaultChannel: ""
+    # -- Notification routing. Empty by default so self-hosted operators can
+    # plug in their own email/Slack/etc. without inheriting the PaaS defaults.
+    notificationChannels: {}
+    templates: {}
+
+# -- Dashboard files shipped by this chart. Each entry becomes one ConfigMap
+# the Grafana sidecar picks up. `file` is relative to the chart root.
+dashboards:
+    folder: Liferay
+    items:
+        backups:
+            file: dashboards/backups.json
+        central-hub:
+            file: dashboards/central-hub.json
+        custom-domains:
+            file: dashboards/custom-domains.json
+        databases:
+            file: dashboards/databases.json
+        kubernetes-workloads:
+            file: dashboards/kubernetes-workloads.json
+        load-balancers:
+            file: dashboards/load-balancers.json
+        secrets:
+            file: dashboards/secrets.json
+
+# -- Subchart configuration. Values under each subchart key are passed
+# through to the upstream chart with no transformation. See each subchart's
+# values.yaml for the full schema.
+grafana:
+    enabled: true
+    podAnnotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    rbac:
+        namespaced: true
+    serviceMonitor:
+        enabled: false
+    serviceAccount:
+        name: grafana
+    # -- Datasources are not provisioned here; the chart renders a
+    # cloud-specific ConfigMap that the Grafana datasources sidecar picks up.
+    # Setting datasources: {} here keeps the subchart from creating its own.
+    datasources: {}
+    sidecar:
+        logLevel: error
+        alerts:
+            enabled: true
+            env:
+                HEALTH_PORT: 8081
+            labelValue: "true"
+            searchNamespace: ""
+            watchMethod: SLEEP
+            resource: configmap
+        dashboards:
+            enabled: true
+            env:
+                HEALTH_PORT: 8084
+            labelValue: "true"
+            searchNamespace: ""
+            watchMethod: SLEEP
+            resource: configmap
+            folderAnnotation: grafana_folder
+            provider:
+                foldersFromFilesStructure: true
+        datasources:
+            enabled: true
+            env:
+                HEALTH_PORT: 8082
+            defaultDatasourceEnabled: true
+            labelValue: "true"
+            searchNamespace: ""
+            watchMethod: SLEEP
+            resource: configmap
+            alertmanager:
+                enabled: false
+            timeout: 180s
+        plugins:
+            enabled: true
+    grafana.ini:
+        analytics:
+            check_for_plugin_updates: true
+            check_for_updates: true
+            reporting_enabled: false
+        annotations:
+            cleanupjob_batchsize: 300
+        annotations.api:
+            max_age: 10d
+            max_annotations_to_keep: 3000
+        annotations.dashboard:
+            max_age: 10d
+            max_annotations_to_keep: 3000
+        dashboards:
+            default_home_dashboard_path: /tmp/dashboards/Liferay/central-hub.json
+        feature_toggles:
+            enable: accessControlOnCall,idForwarding,externalServiceAccounts
+        log:
+            mode: console
+            level: error
+            filters: plugins:error
+        log.console:
+            format: json
+        plugins:
+            disable_plugins: grafana-lokiexplore-app
+        server:
+            enable_gzip: true
+            read_timeout: 0
+        unified_alerting.state_history.annotations:
+            max_age: 10d
+            max_annotations_to_keep: 3000
+        users:
+            default_theme: light
+    podDisruptionBudget:
+        maxUnavailable: 1
+    # -- Network policy is disabled by default because the allowed CIDR ranges
+    # are cloud-specific (GCP health check IPs vs AWS NLB ranges). Operators
+    # enable and configure this on their own clusters.
+    networkPolicy:
+        enabled: false
+
+kube-state-metrics:
+    enabled: true
+    networkPolicy:
+        enabled: true
+        egress:
+            -   {}
+        # -- Default ingress allows traffic from any pod in the same namespace.
+        # Override per cluster to restrict to your Prometheus collector pods.
+        ingress:
+            -   from:
+                    -   podSelector: {}
+    podDisruptionBudget:
+        maxUnavailable: 1
+    resources:
+        limits:
+            cpu: 30m
+            memory: 64Mi
+        requests:
+            cpu: 10m
+            memory: 32Mi
+    prometheusScrape: false
+    prometheus:
+        monitor:
+            enabled: false
+    extraArgs:
+        -   --v=1
+        # -- Expand the metric allowlist to include resource-limits and
+        # resource-requests, which the universal alert rules need to compute
+        # utilization ratios.
+        -   --metric-allowlist=kube_deployment_status_replicas_ready,kube_statefulset_status_replicas_ready,kube_pod_container_status_restarts_total,kube_pod_container_resource_limits,kube_pod_container_resource_requests,kube_pod_container_info,kube_namespace_labels,kube_node_info,kube_node_status_condition
+    serviceAccount:
+        automountServiceAccountToken: false
+
+prometheus-node-exporter:
+    enabled: true
+    rbac:
+        create: true
+    serviceAccount:
+        create: true
+        automountServiceAccountToken: false
+    prometheus:
+        monitor:
+            enabled: false
+        podMonitor:
+            enabled: false
+    # -- NFS-mounted disks on GKE may require root group access. Override per
+    # cluster if your storage classes do not need this.
+    securityContext:
+        fsGroup: 0
+    service:
+        enabled: true
+    networkPolicy:
+        enabled: true
+        ingress:
+            -   from:
+                    -   podSelector: {}
+    resources:
+        limits:
+            cpu: 102m
+            memory: 180Mi
+        requests:
+            cpu: 102m
+            memory: 180Mi
+    extraArgs:
+        -   --log.level=error
+        -   --log.format=json
+
+prometheus-pushgateway:
+    enabled: true
+    resources:
+        limits:
+            cpu: 100m
+            memory: 50Mi
+        requests:
+            cpu: 100m
+            memory: 30Mi
+    extraArgs:
+        -   --persistence.file=/data/pushgateway.data
+        -   --persistence.interval=1m
+        -   --log.format=json
+        -   --log.level=error
+    extraContainers:
+        -   name: pushgateway-cleaner
+            args:
+                -   --sync-period=1m
+                -   --ttl=1m
+            image: ghcr.io/abatilo/pushgateway-cleaner:v0.1.3
+            resources:
+                limits:
+                    cpu: 40m
+                    memory: 16Mi
+                requests:
+                    cpu: 20m
+                    memory: 4Mi
+    automountServiceAccountToken: false
+    networkPolicy:
+        allowAll: true

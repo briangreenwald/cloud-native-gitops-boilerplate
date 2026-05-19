@@ -1,0 +1,16 @@
+{{- if .Values.jobs.gcpDatasourceSyncer.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+    annotations:
+        helm.sh/hook: post-install,post-upgrade
+        helm.sh/hook-delete-policy: hook-succeeded
+        helm.sh/hook-weight: "100"
+    labels:
+        {{- include "observability-paas.labels" . | nindent 8 }}
+    name: {{ printf "%s-init" (include "observability-paas.datasourceSyncer.fullname" .) | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    ttlSecondsAfterFinished: 60
+    {{- include "observability-paas.datasourceSyncer.podTemplate" . | nindent 4 }}
+{{- end }}

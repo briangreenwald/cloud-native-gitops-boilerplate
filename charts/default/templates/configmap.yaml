@@ -1,0 +1,93 @@
+apiVersion: v1
+data:
+    {{- if not .Values.configmap.overrideDefaults }}
+    000_jdk_java_options.sh: |
+        #!/usr/bin/env bash
+
+        export JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS} --add-opens=jdk.naming.dns/com.sun.jndi.dns=java.naming"
+    010_install_prometheus_jmx_agent.sh: |
+        #!/usr/bin/env bash
+
+        if [ "${JMX_AGENT_YAML}x" != "x" ]
+        then
+            if [ ! -f /opt/liferay/metrics/jmx_prometheus_javaagent.jar ]
+            then
+                JMX_AGENT_VERSION=${JMX_AGENT_VERSION:-1.5.0}
+
+                curl \
+                    --fail \
+                    --location \
+                    --output /opt/liferay/metrics/jmx_prometheus_javaagent.jar \
+                    --show-error \
+                    --silent \
+                    https://github.com/prometheus/jmx_exporter/releases/download/${JMX_AGENT_VERSION}/jmx_prometheus_javaagent-${JMX_AGENT_VERSION}.jar
+            fi
+
+            export CATALINA_OPTS="${CATALINA_OPTS} -javaagent:/opt/liferay/metrics/jmx_prometheus_javaagent.jar=${JMX_AGENT_PORT:+${JMX_AGENT_PORT}:}/opt/liferay/metrics/metrics_exporter.yaml"
+
+            echo "${JMX_AGENT_YAML}" > /opt/liferay/metrics/metrics_exporter.yaml
+        fi
+    portal-cloud.properties: |
+        {{- if .Values.portalProperties }}
+        {{- .Values.portalProperties | nindent 8 }}
+        {{- end }}
+        {{- range $k, $v := .Values.dependencies }}
+        {{- if $v.portalProperties }}
+        {{- $v.portalProperties | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        configuration.override.com.liferay.portal.bundle.blacklist.internal.configuration.BundleBlacklistConfiguration_blacklistBundleSymbolicNames=[\
+            {{- $PREFIX := "" }}
+            {{- range $bundle := .Values.portalBundleDenyList }}
+            {{ $PREFIX }}{{ $bundle | quote }}\
+            {{- $PREFIX = "," -}}
+            {{- end }}
+            {{- range $k, $v := .Values.dependencies }}
+            {{- range $bundle := $v.portalBundleDenyList }}
+            {{ $PREFIX }}{{ $bundle | quote }}\
+            {{- $PREFIX = "," -}}
+            {{- end }}
+            {{- end }}
+        ]
+        configuration.override.com.liferay.portal.component.blacklist.internal.configuration.ComponentBlacklistConfiguration_blacklistComponentNames=[\
+            {{- $PREFIX := "" }}
+            {{- range $component := .Values.portalComponentDenyList }}
+            {{ $PREFIX }}{{ $component | quote }}\
+            {{- $PREFIX = "," }}
+            {{- end }}
+            {{- range $k, $v := .Values.dependencies }}
+            {{- range $component := $v.portalComponentDenyList }}
+            {{ $PREFIX }}{{ $component | quote }}\
+            {{- $PREFIX = "," }}
+            {{- end }}
+            {{- end }}
+        ]
+        {{ if or (gt (int .Values.replicaCount) 1) .Values.autoscaling.enabled -}}
+        cluster.link.autodetect.address=
+        cluster.link.channel.properties.control=/opt/liferay/unicast.xml
+        cluster.link.channel.properties.transport.0=/opt/liferay/unicast.xml
+        cluster.link.enabled=true
+        enterprise.product.notification.enabled=false
+        {{ end }}
+        {{- tpl (.Files.Get "resources/portal-cloud.properties") $ | nindent 8 }}
+    portal-ext.properties: |
+        include-and-override=portal-liferay-online-config.properties
+        include-and-override=portal-cloud.properties
+    {{ if or (gt (int .Values.replicaCount) 1) .Values.autoscaling.enabled }}
+    unicast.xml: |
+        {{- tpl (.Files.Get "resources/unicast.xml") $ | nindent 8 }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.configmap.data }}
+    {{- toYaml .Values.configmap.data | nindent 4 }}
+    {{- end }}
+kind: ConfigMap
+metadata:
+    {{- with .Values.configmap.annotations }}
+    annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    labels:
+        {{- include "liferay.labels" . | nindent 8 }}
+    name: {{ include "liferay.name" . }}
+    namespace: {{ include "liferay.namespace" . }}

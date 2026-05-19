@@ -1,0 +1,26 @@
+{{- if eq .Values.logs.backend "cloudwatch" -}}
+{{- $region := required "logs.cloudwatch.region must be set when logs.backend=cloudwatch" .Values.logs.cloudwatch.region -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        {{- include "observability.labels" . | nindent 8 }}
+        grafana_datasource: "true"
+    name: {{ printf "%s-cloudwatch-datasource" (include "observability.fullname" .) | trunc 63 | trimSuffix "-" | quote }}
+    namespace: {{ include "observability.namespace" . | quote }}
+data:
+    cloudwatch-datasource.yaml: |
+        apiVersion: 1
+        datasources:
+            -   access: proxy
+                editable: true
+                jsonData:
+                    authType: {{ .Values.logs.cloudwatch.authType | quote }}
+                    defaultRegion: {{ $region | quote }}
+                    {{- with .Values.logs.cloudwatch.assumeRoleArn }}
+                    assumeRoleArn: {{ . | quote }}
+                    {{- end }}
+                name: AWS CloudWatch Logs
+                type: cloudwatch
+                uid: liferay-cloudwatch-logs
+{{- end -}}

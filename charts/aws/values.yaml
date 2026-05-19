@@ -1,0 +1,217 @@
+liferay-default:
+    annotations:
+        instrumentation.opentelemetry.io/inject-dotnet: "false"
+        instrumentation.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        instrumentation.opentelemetry.io/inject-python: "false"
+        sidecar.opentelemetry.io/inject: "false"
+    autoscaling:
+        keda:
+            triggerAuthentication:
+                spec:
+                    podIdentity:
+                        provider: aws
+        type: keda
+    configmap:
+        data:
+            com.liferay.portal.search.opensearch2.configuration.OpenSearchConnectionConfiguration-REMOTE.config: |
+                active=B"true"
+                authenticationEnabled=B"true"
+                connectionId="REMOTE"
+                httpSSLEnabled=B"false"
+                networkHostAddresses=["https://$[env:OPENSEARCH_ENDPOINT]"]
+                password="$[env:OPENSEARCH_PASSWORD]"
+                username="$[env:OPENSEARCH_USERNAME]"
+            com.liferay.portal.store.s3.configuration.S3StoreConfiguration.config: |
+                accessKey=""
+                bucketName="$[env:S3_BUCKET_ID]"
+                s3Endpoint=""
+                s3PathStyle=B"false"
+                s3Region="$[env:S3_BUCKET_REGION]"
+                secretKey=""
+    customEnv:
+        x-liferay-aws:
+            -   name: LIFERAY_DL_PERIOD_STORE_PERIOD_IMPL
+                value: com.liferay.portal.store.s3.S3Store
+            -   name: LIFERAY_JDBC_PERIOD_DEFAULT_PERIOD_DRIVER_UPPERCASEC_LASS_UPPERCASEN_AME
+                value: org.postgresql.Driver
+            -   name: LIFERAY_JDBC_PERIOD_DEFAULT_PERIOD_PASSWORD
+                value: ${env.DATABASE_PASSWORD}
+            -   name: LIFERAY_JDBC_PERIOD_DEFAULT_PERIOD_URL
+                value: jdbc:postgresql://${env.DATABASE_ENDPOINT}:${env.DATABASE_PORT}/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
+            -   name: LIFERAY_JDBC_PERIOD_DEFAULT_PERIOD_USERNAME
+                value: ${env.DATABASE_USERNAME}
+            -   name: LIFERAY_WEB_PERIOD_SERVER_PERIOD_FORWARDED_PERIOD_PORT_PERIOD_ENABLED
+                value: "true"
+            -   name: LIFERAY_WEB_PERIOD_SERVER_PERIOD_FORWARDED_PERIOD_PROTOCOL_PERIOD_ENABLED
+                value: "true"
+        x-liferay-aws-opensearch:
+            -   name: LIFERAY_NETWORK_HOST_ADDRESSES
+                value: https://$(OPENSEARCH_ENDPOINT):443
+            -   name: LIFERAY_OPENSEARCH_ENABLED
+                value: "true"
+            -   name: LIFERAY_OPENSEARCH_PASSWORD
+                value: $(OPENSEARCH_PASSWORD)
+    customEnvFrom:
+        x-liferay-aws-database:
+            -   secretRef:
+                    name: database-connection-details
+        x-liferay-aws-doclib:
+            -   secretRef:
+                    name: doclib-connection-details
+        x-liferay-aws-opensearch:
+            -   secretRef:
+                    name: opensearch-connection-details
+    customInitContainers:
+        x-liferay-install-opensearch-modules:
+            -   containerTemplate: |
+                    -   command:
+                        -   bash
+                        -   -c
+                        -   |
+                            function download_module {
+                                {{- if eq .image.tag "latest" }}
+                                local product_version="nightly"
+
+                                local url="{{ .search.opensearch2DownloadBaseURL }}/${product_version}/com.liferay.portal.search.opensearch2.${1}.jar"
+                                {{- else }}
+                                local product_version="{{ .image.tag }}"
+
+                                local url="{{ .search.opensearch2DownloadBaseURL }}/dxp/${product_version}/com.liferay.portal.search.opensearch2.${1}.jar"
+                                {{- end }}
+
+                                local http_code=$( \
+                                    curl \
+                                        --location \
+                                        --output-dir /temp/liferay/deploy \
+                                        --remote-name \
+                                        --retry 5 \
+                                        --retry-all-errors \
+                                        --retry-delay 2 \
+                                        --write-out "%{http_code}" \
+                                        "${url}")
+
+                                if [ "${http_code}" != "200" ]
+                                then
+                                    echo "Unable to download OpenSearch modules for product version ${product_version} from ${url}." >&2
+
+                                    rm --force --verbose /temp/liferay/deploy/com.liferay.portal.search.opensearch2.${1}.jar
+
+                                    exit 1
+                                fi
+                            }
+
+                            function install_existing_opensearch_modules {
+                                if ls /opt/liferay/deploy/com.liferay.portal.search.opensearch2* 1> /dev/null 2>&1
+                                then
+                                    echo "Found existing OpenSearch modules."
+
+                                    cp --verbose /opt/liferay/deploy/com.liferay.portal.search.opensearch2* /temp/liferay/deploy
+
+                                    echo "Install successful. Skipping download."
+
+                                    return 0
+                                else
+                                    echo "No existing OpenSearch modules found in folder /opt/liferay/deploy."
+
+                                    return 1
+                                fi
+                            }
+
+                            function main {
+                                mkdir --parents /temp/liferay/deploy
+
+                                install_existing_opensearch_modules
+
+                                local exit_code=$?
+
+                                if [ "${exit_code}" -ne 0 ]
+                                then
+                                    echo "Downloading OpenSearch modules."
+
+                                    download_module "api"
+                                    download_module "impl"
+                                fi
+
+                                rm --force --verbose "/temp/osgi/modules/com.liferay.portal.search.opensearch2"*
+                            }
+
+                            main
+                        image: {{ printf "%s:%s" .image.repository (.image.tag | toString) }}
+                        imagePullPolicy: {{ .image.pullPolicy }}
+                        name: liferay-install-opensearch-modules
+                        securityContext:
+                            allowPrivilegeEscalation: false
+                            capabilities:
+                                drop:
+                                    -   ALL
+                            seccompProfile:
+                                type: RuntimeDefault
+                        volumeMounts:
+                            -   mountPath: /temp
+                                name: liferay-persistent-volume
+    customLabels:
+        origin: liferay-aws
+    customVolumeMounts:
+        x-liferay-aws-doclib:
+            -   mountPath: /opt/liferay/osgi/configs/com.liferay.portal.store.s3.configuration.S3StoreConfiguration.config
+                name: liferay-configmap
+                subPath: com.liferay.portal.store.s3.configuration.S3StoreConfiguration.config
+        x-liferay-aws-opensearch:
+            -   mountPath: /opt/liferay/osgi/configs/com.liferay.portal.search.opensearch2.configuration.OpenSearchConnectionConfiguration-REMOTE.config
+                name: liferay-configmap
+                subPath: com.liferay.portal.search.opensearch2.configuration.OpenSearchConnectionConfiguration-REMOTE.config
+    dependencies:
+        opensearch2:
+            portalProperties: |
+                configuration.override.com.liferay.portal.search.opensearch2.configuration.OpenSearchConfiguration_remoteClusterConnectionId="REMOTE"
+    network:
+        enabled: true
+        timeouts:
+            backendRequest: 300s
+            request: 300s
+    networkPolicy:
+        enabled: true
+        extraEgress:
+            -   ports:
+                    -   port: 5432
+                        protocol: TCP
+                to:
+                    -   ipBlock:
+                            cidr: 0.0.0.0/0
+                            except:
+                                -   169.254.169.254/32
+            -   ports:
+                    -   port: 443
+                        protocol: TCP
+                to:
+                    -   ipBlock:
+                            cidr: 0.0.0.0/0
+                            except:
+                                -   169.254.169.254/32
+    portalBundleDenyList:
+        -   com.liferay.portal.search.elasticsearch.cross.cluster.replication.impl
+        -   com.liferay.portal.search.elasticsearch.monitoring.web
+        -   com.liferay.portal.search.elasticsearch7.api
+        -   com.liferay.portal.search.elasticsearch7.impl
+        -   com.liferay.portal.search.learning.to.rank.api
+        -   com.liferay.portal.search.learning.to.rank.impl
+    resources:
+        limits:
+            cpu: 4000m
+            memory: 12Gi
+        requests:
+            cpu: 2000m
+            memory: 4Gi
+    search:
+        opensearch2DownloadBaseURL: https://releases.liferay.com/opensearch2
+    volumeClaimTemplates:
+        -   metadata:
+                name: liferay-persistent-volume
+            spec:
+                accessModes:
+                    -   ReadWriteOnce
+                resources:
+                    requests:
+                        storage: 10Gi
+                storageClassName: gp3

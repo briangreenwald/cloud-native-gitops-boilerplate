@@ -1,0 +1,142 @@
+# -- Subchart values passed through to the observability base chart.
+# observability-paas is PaaS-only and currently only supports GCP, so we pin
+# cloudProvider here. AWS PaaS support will land in a future release.
+observability:
+    cloudProvider: gcp
+    # -- PaaS uses GCP Cloud Logging both for the builds dashboard and for
+    # the kubernetes-workload-logs panels. Setting logs.backend wires the
+    # datasource ConfigMap; the plugin install below is what makes the
+    # datasource actually queryable.
+    logs:
+        backend: cloud-logging
+    grafana:
+        plugins:
+            -   googlecloud-logging-datasource
+    # -- Disable the base chart's central-hub. observability-paas ships its
+    # own PaaS-flavored variant with additional tiles (builds, custom
+    # domains) and the PROJECT/LOCATION header badges.
+    dashboards:
+        items:
+            central-hub:
+                enabled: false
+    # -- Alloy (the unified scraper) needs Workload Identity on GCP to remote-
+    # write to GMP. The IAM binding lives in PaaS infrastructure; the
+    # ArgoCD ApplicationSet's templatePatch injects gcpServiceAccount
+    # per-cluster (same pattern as gcpProjectId).
+    alloy:
+        iam:
+            gcpServiceAccount: ""
+
+# -- Central Hub configuration for the PaaS variant. Defaults are empty
+# strings because the ArgoCD ApplicationSet's templatePatch (in
+# charts/deploy/internal/argocd-resources/{nonprd,prd}/applications.yaml)
+# is the source of truth, injecting these from each cluster's metadata.
+# Empty defaults match the existing pattern for jobs.gcpDatasourceSyncer.args.gcpProjectId.
+centralHub:
+    gitUrl: ""
+    argocdUrl: ""
+    argoWorkflowsUrl: ""
+    projectLabel: ""
+    locationLabel: ""
+    # -- DNS zone the PaaS hub uses to build the ArgoCD / Argo Workflows tile
+    # URLs (`https://argocd.${dnsZone}` / `https://argo-workflows.${dnsZone}`).
+    # Populated per-cluster by the ArgoCD ApplicationSet templatePatch from
+    # the cluster's DnsZones annotation.
+    dnsZone: ""
+
+# -- Dashboards added on top of the observability base chart. The PaaS hub
+# replaces the base chart's central-hub.
+dashboards:
+    folder: Liferay
+    items:
+        builds:
+            file: dashboards/builds.json
+        central-hub:
+            file: dashboards/central-hub.json
+
+# -- Liferay-PaaS-only alert rules. Default-empty; PaaS deploy values add
+# entries here without touching the observability base chart.
+alerting:
+    folder: alerts
+    interval: 1m
+    rules: {}
+
+# -- GCP Managed Prometheus datasource-syncer. Rotates the OAuth2 token Grafana
+# uses to query GMP, on a schedule. Required for the GMP datasource to keep
+# working in long-lived PaaS clusters.
+jobs:
+    gcpDatasourceSyncer:
+        enabled: true
+        image:
+            repository: gcr.io/gke-release/prometheus-engine/datasource-syncer
+            tag: v0.17.3-gke.0
+            pullPolicy: IfNotPresent
+        schedule: "*/10 * * * *"
+        args:
+            # -- UIDs of the Grafana datasources to sync. Must match the UID
+            # configured on the observability gmp-datasource ConfigMap.
+            datasourceUids:
+                -   managed-prometheus
+            # -- GCP project ID hosting the GMP workspace. The ArgoCD
+            # ApplicationSet's templatePatch fills this in per-cluster.
+            gcpProjectId: ""
+        resources:
+            limits:
+                cpu: 50m
+                memory: 128Mi
+            requests:
+                cpu: 10m
+                memory: 16Mi
+        initContainer:
+            image:
+                repository: docker.io/bitnami/kubectl
+                tag: 1.35.1@sha256:4c5f63828f5170142d714cdf1f96bad9e223f7ad79bd67d6d6b21e59a188c514
+                pullPolicy: IfNotPresent
+            resources:
+                limits:
+                    cpu: 50m
+                    memory: 128Mi
+                requests:
+                    cpu: 10m
+                    memory: 16Mi
+            env:
+                -   name: DRY_RUN
+                    value: "false"
+                -   name: GRAFANA_SA_TOKEN_SECONDS_TO_LIVE
+                    value: "3600"
+        annotations: {}
+        concurrencyPolicy: Forbid
+        extraEnv: {}
+        podAnnotations: {}
+        restartPolicy: Never
+        # -- When true the script writes the token to a file in an emptyDir
+        # shared between containers, instead of a Kubernetes Secret.
+        serviceAccountTokenInFile: true
+
+    # -- Optional CronJob that periodically deletes manually-provisioned
+    # Grafana resources (alert rules, contact points, datasources, dashboards
+    # whose provenance != "file"). Default off; turn on if your operators
+    # have a habit of clicking around the UI.
+    deleteUnprovisionedResources:
+        enabled: false
+        schedule: "0 23 * * 0"
+        resources:
+            limits:
+                cpu: 50m
+                memory: 128Mi
+            requests:
+                cpu: 10m
+                memory: 16Mi
+        image:
+            repository: docker.io/bitnami/kubectl
+            tag: 1.35.1@sha256:4c5f63828f5170142d714cdf1f96bad9e223f7ad79bd67d6d6b21e59a188c514
+            pullPolicy: IfNotPresent
+        restartPolicy: OnFailure
+        concurrencyPolicy: Forbid
+        annotations: {}
+        podAnnotations: {}
+        extraEnv:
+            -   name: DRY_RUN
+                value: "false"
+            -   name: IGNORE_CONFIRM
+                value: "true"
