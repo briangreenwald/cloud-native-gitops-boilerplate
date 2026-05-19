@@ -1,0 +1,18 @@
+aws: {}
+clusterBootstrap:
+    image: alpine:3
+    resources:
+        limits:
+            cpu: 3m
+            memory: 16Mi
+        requests:
+            cpu: 1m
+            memory: 8Mi
+    script: |
+        sysctl -w vm.max_map_count=1048576
+crossplaneNamespace: crossplane-system
+gateway:
+    internetFacing: true
+    namespace: envoy-gateway-system
+liferay-subchart-backup-restore:
+    enabled: true

@@ -1,0 +1,54 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+    labels:
+        component: backup-restore-platform
+    name: backup-restore-cluster-role
+rules:
+    -   apiGroups: [""]
+        resources: ["namespaces"]
+        verbs:
+            -   get
+            -   list
+    -   apiGroups: [""]
+        resourceNames: ["managed-service-details"]
+        resources: ["secrets"]
+        verbs:
+            -   create
+            -   get
+            -   patch
+            -   update
+    -   apiGroups: ["apps"]
+        resources: ["statefulsets"]
+        verbs:
+            -   get
+            -   list
+            -   patch
+            -   watch
+    -   apiGroups: ["argoproj.io"]
+        resources: ["workflowtaskresults"]
+        verbs:
+            -   create
+            -   patch
+    -   apiGroups: ["aws.liferay.com"]
+        resources: ["liferayinfrastructures"]
+        verbs:
+            -   get
+            -   list
+            -   patch
+            -   watch
+    -   apiGroups: ["backup.aws.m.upbound.io"]
+        resources: ["vaults"]
+        verbs:
+            -   get
+            -   list
+    -   apiGroups: ["iam.aws.m.upbound.io"]
+        resources: ["roles"]
+        verbs:
+            -   get
+            -   list
+    -   apiGroups: ["s3.aws.m.upbound.io"]
+        resources: ["buckets"]
+        verbs:
+            -   get
+            -   list
