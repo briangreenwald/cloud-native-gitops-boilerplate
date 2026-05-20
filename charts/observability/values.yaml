@@ -378,6 +378,8 @@ grafana:
             check_for_plugin_updates: true
             check_for_updates: true
             reporting_enabled: false
+        auth:
+            sigv4_auth_enabled: true
         annotations:
             cleanupjob_batchsize: 300
         annotations.api:
