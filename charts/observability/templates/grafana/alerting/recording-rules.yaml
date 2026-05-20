@@ -21,7 +21,10 @@ data:
                     {{- range $key, $rule := .Values.alerting.recordingRules }}
                     -   uid: {{ $key | quote }}
                         title: {{ $rule.record | quote }}
-                        record: {{ $rule.record | quote }}
+                        record:
+                            metric: {{ $rule.record | quote }}
+                            from: A
+                            targetDatasourceUid: {{ $datasourceUid | quote }}
                         data:
                             -   refId: A
                                 datasourceUid: {{ $datasourceUid | quote }}
