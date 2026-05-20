@@ -1,0 +1,12 @@
+{{- $namespace := include "observability.namespace" . -}}
+{{- if ne $namespace .Release.Namespace -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+    annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    labels:
+        {{- include "observability.labels" . | nindent 8 }}
+        pod-security.kubernetes.io/enforce: restricted
+    name: {{ $namespace | quote }}
+{{- end -}}

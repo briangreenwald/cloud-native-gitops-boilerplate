@@ -9,7 +9,12 @@ customLabels: {}
 # -- Optional override for the resource name prefix.
 fullnameOverride: ""
 nameOverride: ""
-namespaceOverride: ""
+# -- Namespace where the observability stack (grafana, alloy, KSM, pushgateway,
+# node-exporter, and the chart's own ConfigMaps/SAs) is deployed. Defaults
+# to "observability" so the stack lives in its own dedicated namespace rather
+# than the umbrella release's namespace. Must match observability_config.namespace
+# in terraform so the IRSA role trust policies resolve.
+namespaceOverride: observability
 
 # -- AWS-specific configuration. Required when cloudProvider=aws.
 aws:
@@ -93,11 +98,11 @@ logs:
 alloy:
     enabled: true
     # -- Namespace where Alloy's ServiceAccount, ConfigMap, DaemonSet and
-    # Service are created. Defaults to "alloy" so the IRSA role's trust
-    # policy (which references system:serviceaccount:<this>:liferay-alloy)
-    # can be a cluster-wide singleton. Must match the alloy_namespace
-    # value passed to the terraform observability module.
-    namespace: alloy
+    # Service are created. Defaults to "observability" so the stack shares
+    # one namespace. The IRSA trust policy references
+    # system:serviceaccount:<this>:liferay-alloy. Must match
+    # observability_config.namespace in terraform.
+    namespace: observability
     # -- Scrape interval applied to every prometheus.scrape block in the
     # generated River config. Override per-target if needed.
     scrapeInterval: 1m
@@ -156,10 +161,10 @@ alloy:
 # Operator-relevant alloy.* values live above; this block is mostly
 # implementation detail.
 grafana-alloy:
-    # -- Routes the subchart's DaemonSet and Service to the alloy namespace
-    # so they sit alongside the SA + ConfigMap our chart creates. Must match
-    # alloy.namespace above.
-    namespaceOverride: alloy
+    # -- Routes the subchart's DaemonSet and Service to the observability
+    # namespace so they sit alongside the SA + ConfigMap our chart creates.
+    # Must match alloy.namespace above.
+    namespaceOverride: observability
     alloy:
         configMap:
             create: false
@@ -305,6 +310,9 @@ dashboards:
 # values.yaml for the full schema.
 grafana:
     enabled: true
+    # -- Routes grafana into the observability namespace alongside the rest
+    # of the stack. Must match the top-level namespaceOverride.
+    namespaceOverride: observability
     podAnnotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
     rbac:
@@ -319,6 +327,12 @@ grafana:
     serviceMonitor:
         enabled: false
     serviceAccount:
+        # -- The eks.amazonaws.com/role-arn annotation is populated by the
+        # ArgoCD ApplicationSet from terraform's grafana_role; leave empty
+        # here so chart consumers without AWS don't render a broken SA.
+        annotations:
+            eks.amazonaws.com/role-arn: ""
+        automountServiceAccountToken: true
         name: grafana
     # -- Datasources are not provisioned here; the chart renders a
     # cloud-specific ConfigMap that the Grafana datasources sidecar picks up.
@@ -402,6 +416,7 @@ grafana:
 
 kube-state-metrics:
     enabled: true
+    namespaceOverride: observability
     networkPolicy:
         enabled: true
         egress:
@@ -435,6 +450,7 @@ kube-state-metrics:
 
 prometheus-node-exporter:
     enabled: true
+    namespaceOverride: observability
     rbac:
         create: true
     serviceAccount:
@@ -469,6 +485,7 @@ prometheus-node-exporter:
 
 prometheus-pushgateway:
     enabled: true
+    namespaceOverride: observability
     resources:
         limits:
             cpu: 100m
