@@ -24,7 +24,7 @@ metadata:
     labels:
         {{- include "observability.labels" . | nindent 8 }}
     name: liferay-alloy-config
-    namespace: {{ include "observability.namespace" . | quote }}
+    namespace: {{ .Values.alloy.namespace | quote }}
 data:
     config.alloy: |
         logging {

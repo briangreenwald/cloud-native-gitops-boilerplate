@@ -92,6 +92,12 @@ logs:
 # namespace.
 alloy:
     enabled: true
+    # -- Namespace where Alloy's ServiceAccount, ConfigMap, DaemonSet and
+    # Service are created. Defaults to "alloy" so the IRSA role's trust
+    # policy (which references system:serviceaccount:<this>:liferay-alloy)
+    # can be a cluster-wide singleton. Must match the alloy_namespace
+    # value passed to the terraform observability module.
+    namespace: alloy
     # -- Scrape interval applied to every prometheus.scrape block in the
     # generated River config. Override per-target if needed.
     scrapeInterval: 1m
@@ -150,6 +156,10 @@ alloy:
 # Operator-relevant alloy.* values live above; this block is mostly
 # implementation detail.
 grafana-alloy:
+    # -- Routes the subchart's DaemonSet and Service to the alloy namespace
+    # so they sit alongside the SA + ConfigMap our chart creates. Must match
+    # alloy.namespace above.
+    namespaceOverride: alloy
     alloy:
         configMap:
             create: false
