@@ -155,8 +155,31 @@ grafana-alloy:
             create: false
             key: config.alloy
             name: liferay-alloy-config
+        securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+                drop:
+                    -   ALL
+            privileged: false
+            readOnlyRootFilesystem: false
+    configReloader:
+        securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+                drop:
+                    -   ALL
+            privileged: false
+            readOnlyRootFilesystem: false
     controller:
         type: daemonset
+    global:
+        podSecurityContext:
+            fsGroup: 473
+            runAsGroup: 473
+            runAsNonRoot: true
+            runAsUser: 473
+            seccompProfile:
+                type: RuntimeDefault
     serviceAccount:
         create: false
         name: liferay-alloy
