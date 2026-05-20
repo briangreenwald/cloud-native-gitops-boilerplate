@@ -27,6 +27,9 @@ data:
                             targetDatasourceUid: {{ $datasourceUid | quote }}
                         data:
                             -   refId: A
+                                relativeTimeRange:
+                                    from: 3600
+                                    to: 0
                                 datasourceUid: {{ $datasourceUid | quote }}
                                 model:
                                     datasource:
