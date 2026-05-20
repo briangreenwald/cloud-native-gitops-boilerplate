@@ -149,7 +149,7 @@ alloy:
 # owns the SA and ConfigMap; the subchart only renders the DaemonSet + RBAC.
 # Operator-relevant alloy.* values live above; this block is mostly
 # implementation detail.
-grafanaAlloy:
+grafana-alloy:
     alloy:
         configMap:
             create: false
