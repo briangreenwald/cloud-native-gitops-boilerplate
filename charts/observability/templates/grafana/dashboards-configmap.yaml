@@ -2,6 +2,12 @@
 {{- $datasourceUid := include "observability.datasourceUid" . -}}
 {{- $namespace := include "observability.namespace" . -}}
 {{- $items := deepCopy .Values.dashboards.items -}}
+{{- $searchEngine := "" -}}
+{{- if .Values.search.elasticsearch.enabled -}}
+{{- $searchEngine = "elasticsearch" -}}
+{{- else if .Values.search.opensearch.enabled -}}
+{{- $searchEngine = "opensearch" -}}
+{{- end -}}
 {{- if eq .Values.logs.backend "cloud-logging" -}}
 {{- $_ := set $items "kubernetes-workload-logs" (dict "file" "dashboards/logs/cloud-logging-kubernetes-logs.json") -}}
 {{- else if eq .Values.logs.backend "cloudwatch" -}}
@@ -39,7 +45,7 @@ muted placeholder pointing the operator at the relevant values key.
 {{- if not $raw -}}
 {{- fail (printf "Dashboard file %s not found in chart" $entry.file) -}}
 {{- end -}}
-{{- $rendered := $raw | replace "${DS_PROMETHEUS}" $datasourceUid -}}
+{{- $rendered := $raw | replace "${DS_PROMETHEUS}" $datasourceUid | replace "${SEARCH_ENGINE}" $searchEngine -}}
 {{- if eq $key "central-hub" -}}
 {{- if not $.Values.centralHub.gitUrl -}}
 {{- fail "centralHub.gitUrl is required when the central-hub dashboard is enabled. Set it in your values.yaml or disable the dashboard via dashboards.items.central-hub.enabled: false." -}}

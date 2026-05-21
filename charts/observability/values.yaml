@@ -91,6 +91,20 @@ logs:
         # -- IAM role to assume, if not using the pod's IRSA role directly.
         assumeRoleArn: ""
 
+# -- Search engine selection. Drives the "Search Metrics" row in
+# kubernetes-workloads and the "Search Logs" panels in the log dashboards. The
+# chart picks the namespace suffix (e.g. "$environment-elasticsearch") at
+# render time based on which gate is enabled. Set exactly one to true for
+# in-cluster ECK Elasticsearch or in-cluster OpenSearch deployments. When
+# both are false the search panels render with an empty suffix and show no
+# data — appropriate when search runs as a managed service (e.g. AWS Managed
+# OpenSearch), which is handled via separate CloudWatch panels.
+search:
+    elasticsearch:
+        enabled: false
+    opensearch:
+        enabled: false
+
 # -- Grafana Alloy is the unified scraper across all clouds. The chart owns
 # Alloy's ServiceAccount and ConfigMap; the alloy subchart consumes them via
 # static names (liferay-alloy / liferay-alloy-config). One Alloy install per
@@ -441,6 +455,10 @@ kube-state-metrics:
     prometheus:
         monitor:
             enabled: false
+    # -- Expose the liferay.com/observable namespace label on
+    # kube_namespace_labels so dashboards can filter customer environments.
+    metricLabelsAllowlist:
+        -   "namespaces=[liferay.com/observable]"
     extraArgs:
         -   --v=1
         # -- Expand the metric allowlist to include resource-limits and

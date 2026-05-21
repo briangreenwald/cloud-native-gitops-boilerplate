@@ -154,7 +154,7 @@
             "type": "cloudwatch",
             "uid": "liferay-cloudwatch-logs"
           },
-          "expression": "fields @timestamp, @message, kubernetes.namespace_name, kubernetes.pod_name, kubernetes.container_name\n| filter kubernetes.namespace_name = \"$environment-$search_engine\"\n| sort @timestamp desc\n| limit 1000",
+          "expression": "fields @timestamp, @message, kubernetes.namespace_name, kubernetes.pod_name, kubernetes.container_name\n| filter kubernetes.namespace_name = \"$environment-${SEARCH_ENGINE}\"\n| sort @timestamp desc\n| limit 1000",
           "id": "",
           "logGroups": [
             {
@@ -205,33 +205,6 @@
         "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "selected": true,
-          "text": "elasticsearch",
-          "value": "elasticsearch"
-        },
-        "includeAll": false,
-        "label": "Search Engine",
-        "name": "search_engine",
-        "options": [
-          {
-            "selected": true,
-            "text": "elasticsearch",
-            "value": "elasticsearch"
-          },
-          {
-            "selected": false,
-            "text": "opensearch",
-            "value": "opensearch"
-          }
-        ],
-        "query": "elasticsearch,opensearch",
-        "queryValue": "",
-        "skipUrlSync": false,
-        "type": "custom"
       },
       {
         "allowCustomValue": true,
