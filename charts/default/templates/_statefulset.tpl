@@ -469,6 +469,16 @@ spec:
                     protocol: TCP
                 -   port: http
                     protocol: TCP
+        {{- if .statefulset.networkPolicy.cluster.kubernetesEndpointCidrs }}
+        {{- range (splitList "," .statefulset.networkPolicy.cluster.kubernetesEndpointCidrs) }}
+        -   from:
+                -   ipBlock:
+                        cidr: {{ . | trim }}
+            ports:
+                -   port: http
+                    protocol: TCP
+        {{- end }}
+        {{- end }}
         {{- with .statefulset.networkPolicy.extraIngress }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
