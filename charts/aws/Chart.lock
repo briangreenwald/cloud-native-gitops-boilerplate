@@ -1,6 +1,6 @@
 dependencies:
 - name: liferay-default
-  repository: file://../default
-  version: 0.5.0
-digest: sha256:db0b04182eb43de788ae277d22aab625963c2c437c8512399868fcd98fbe380d
-generated: "2026-04-28T17:07:26.896752-05:00"
+  repository: file://../liferay-default
+  version: 0.5.1
+digest: sha256:ecde199b07d98db6cd01d326673af5574f9ba5898c2937e18e8c15e345e6fe64
+generated: "2026-05-21T11:06:34.193263-05:00"
