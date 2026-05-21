@@ -1044,7 +1044,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (pod) (\n  avg_over_time(container_memory_working_set_bytes{namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n)",
+              "expr": "sum by (pod) (\n  avg_over_time(container_memory_working_set_bytes{namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n)",
               "legendFormat": "Usage | {{pod}}",
               "range": true,
               "refId": "pod_usage"
@@ -1055,7 +1055,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  sum by (pod) (\n    avg_over_time(kube_pod_container_resource_requests{resource=\"memory\", namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
+              "expr": "avg(\n  sum by (pod) (\n    avg_over_time(kube_pod_container_resource_requests{resource=\"memory\", namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
               "instant": false,
               "legendFormat": "Requests",
               "range": true,
@@ -1067,7 +1067,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  sum by (pod) (\n    avg_over_time(kube_pod_container_resource_limits{resource=\"memory\", namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
+              "expr": "avg(\n  sum by (pod) (\n    avg_over_time(kube_pod_container_resource_limits{resource=\"memory\", namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
               "instant": false,
               "legendFormat": "Limits",
               "range": true,
@@ -1244,7 +1244,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[$__rate_interval]))",
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[$__rate_interval]))",
               "legendFormat": "Usage | {{ pod }}",
               "range": true,
               "refId": "usage"
@@ -1255,7 +1255,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  sum by (pod) (\n    avg_over_time(kube_pod_container_resource_requests{resource=\"cpu\", namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
+              "expr": "avg(\n  sum by (pod) (\n    avg_over_time(kube_pod_container_resource_requests{resource=\"cpu\", namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
               "instant": false,
               "legendFormat": "Request",
               "range": true,
@@ -1267,7 +1267,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  sum by (pod) (avg_over_time(\n    kube_pod_container_resource_limits{resource=\"cpu\", namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
+              "expr": "avg(\n  sum by (pod) (avg_over_time(\n    kube_pod_container_resource_limits{resource=\"cpu\", namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[$__rate_interval])\n  )\n)",
               "instant": false,
               "legendFormat": "Limits",
               "range": true,
@@ -1375,7 +1375,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (pod)(increase(kube_pod_container_status_restarts_total{namespace=\"$environment-elasticsearch\", container!=\"cloud-sql-proxy\"}[${__interval}]))",
+              "expr": "sum by (pod)(increase(kube_pod_container_status_restarts_total{namespace=\"$environment-$search_engine\", container!=\"cloud-sql-proxy\"}[${__interval}]))",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1412,13 +1412,13 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+        "definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
         "label": "Environment",
         "name": "environment",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+          "query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1426,6 +1426,33 @@
         "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "selected": true,
+          "text": "elasticsearch",
+          "value": "elasticsearch"
+        },
+        "includeAll": false,
+        "label": "Search Engine",
+        "name": "search_engine",
+        "options": [
+          {
+            "selected": true,
+            "text": "elasticsearch",
+            "value": "elasticsearch"
+          },
+          {
+            "selected": false,
+            "text": "opensearch",
+            "value": "opensearch"
+          }
+        ],
+        "query": "elasticsearch,opensearch",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
       }
     ]
   },

@@ -234,7 +234,7 @@ alerting:
                 ) > 3
                 and on(namespace)
                 label_replace(
-                    kube_namespace_labels{label_project_customer="yes"},
+                    kube_namespace_labels{label_liferay_com_observable="true"},
                     "namespace", "$1", "exported_namespace", "(.*)"
                 )
             labels:

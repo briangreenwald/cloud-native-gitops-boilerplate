@@ -160,7 +160,7 @@
             "uid": "googlecloud-logging-datasource"
           },
           "projectId": "liferaycloud-dev-cust-d1",
-          "queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment-elasticsearch\"\n$Filters",
+          "queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment-$search_engine\"\n$Filters",
           "refId": "A",
           "viewId": "_AllLogs"
         }
@@ -188,13 +188,13 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+        "definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
         "label": "Environment",
         "name": "environment",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+          "query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -202,6 +202,33 @@
         "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "selected": true,
+          "text": "elasticsearch",
+          "value": "elasticsearch"
+        },
+        "includeAll": false,
+        "label": "Search Engine",
+        "name": "search_engine",
+        "options": [
+          {
+            "selected": true,
+            "text": "elasticsearch",
+            "value": "elasticsearch"
+          },
+          {
+            "selected": false,
+            "text": "opensearch",
+            "value": "opensearch"
+          }
+        ],
+        "query": "elasticsearch,opensearch",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
       },
       {
         "baseFilters": [],

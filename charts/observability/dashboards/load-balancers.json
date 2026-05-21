@@ -753,11 +753,11 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+        "definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
         "label": "Environment",
         "name": "environment",
         "options": [],
-        "query": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},exported_namespace)",
+        "query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
         "refresh": 1,
         "regex": "/(?<value>.*-(?<text>.*))/",
         "regexApplyTo": "value",
