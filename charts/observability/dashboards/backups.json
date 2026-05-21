@@ -583,13 +583,13 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
+        "definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
         "label": "Environment",
         "name": "environment",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},exported_namespace)",
+          "query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
