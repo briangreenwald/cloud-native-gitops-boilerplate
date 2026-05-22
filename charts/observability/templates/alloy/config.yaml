@@ -289,12 +289,8 @@ data:
           }
         }
 
-        discovery.distribute "cloudwatch_rds" {
-          targets = prometheus.exporter.cloudwatch.rds.targets
-        }
-
         discovery.relabel "cloudwatch_rds" {
-          targets = discovery.distribute.cloudwatch_rds.output
+          targets = prometheus.exporter.cloudwatch.rds.targets
           rule {
             target_label = "job"
             replacement  = "cloudwatch-rds"
@@ -309,6 +305,9 @@ data:
           targets         = discovery.relabel.cloudwatch_rds.output
           forward_to      = [prometheus.remote_write.default.receiver]
           scrape_interval = {{ $cw.scrapeInterval | quote }}
+          clustering {
+            enabled = true
+          }
         }
         {{- end }}
 {{- end -}}

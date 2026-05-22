@@ -226,12 +226,15 @@ grafana-alloy:
     # Must match alloy.namespace above.
     namespaceOverride: observability
     alloy:
-        # -- Required by alloy.scrape.cloudwatchRds: clustering shards
-        # the cloudwatch exporter target deterministically across the
-        # DaemonSet via `discovery.distribute`, so exactly one pod
-        # scrapes (otherwise every node would issue GetMetricData
-        # calls — N× CloudWatch billing). Other scrapes are unaffected
-        # unless wrapped in `discovery.distribute`.
+        # -- Required by alloy.scrape.cloudwatchRds: the cloudwatch RDS
+        # scrape component uses `clustering { enabled = true }` so that
+        # exactly one DaemonSet pod forwards CloudWatch samples to AMP
+        # (otherwise every pod would push duplicate series). Note: each
+        # pod still runs its own exporter and independently queries
+        # CloudWatch — Alloy lacks a standalone target-distribution
+        # component (no `discovery.distribute`). Splitting Alloy into a
+        # single-replica Deployment for CloudWatch is the long-term fix
+        # if the metric list or RDS count grows enough to matter.
         clustering:
             enabled: true
         configMap:
