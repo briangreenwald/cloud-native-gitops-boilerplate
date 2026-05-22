@@ -260,4 +260,55 @@ data:
           scrape_interval = {{ $interval | quote }}
         }
         {{- end }}
+
+        {{- if and (eq $cloud "aws") .Values.alloy.scrape.cloudwatchRds.enabled }}
+        {{- $cw := .Values.alloy.scrape.cloudwatchRds -}}
+        {{- $cwRegion := default .Values.aws.region $cw.region }}
+
+        prometheus.exporter.cloudwatch "rds" {
+          sts_region = {{ $cwRegion | quote }}
+
+          discovery {
+            type    = "AWS/RDS"
+            regions = [{{ $cwRegion | quote }}]
+            search_tags = [
+              { key = "Name", value = {{ $cw.nameTagRegex | quote }} },
+            ]
+            {{- range $cw.metrics }}
+            metric {
+              name       = {{ .name | quote }}
+              statistics = [{{ range $i, $s := .statistics }}{{ if $i }}, {{ end }}{{ $s | quote }}{{ end }}]
+              period     = "1m"
+            }
+            {{- end }}
+          }
+
+          decoupled_scraping {
+            enabled         = true
+            scrape_interval = {{ $cw.discoveryInterval | quote }}
+          }
+        }
+
+        discovery.distribute "cloudwatch_rds" {
+          targets = prometheus.exporter.cloudwatch.rds.targets
+        }
+
+        discovery.relabel "cloudwatch_rds" {
+          targets = discovery.distribute.cloudwatch_rds.output
+          rule {
+            target_label = "job"
+            replacement  = "cloudwatch-rds"
+          }
+          rule {
+            source_labels = ["dimension_DBInstanceIdentifier"]
+            target_label  = "dbinstance_identifier"
+          }
+        }
+
+        prometheus.scrape "cloudwatch_rds" {
+          targets         = discovery.relabel.cloudwatch_rds.output
+          forward_to      = [prometheus.remote_write.default.receiver]
+          scrape_interval = {{ $cw.scrapeInterval | quote }}
+        }
+        {{- end }}
 {{- end -}}

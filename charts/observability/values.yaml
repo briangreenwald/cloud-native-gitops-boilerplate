@@ -155,6 +155,52 @@ alloy:
                 component: liferay
             port: 12345
             path: /metrics
+        # -- AWS RDS CloudWatch metrics, scraped via Alloy's built-in
+        # prometheus.exporter.cloudwatch (YACE-based). AWS-only; ignored when
+        # cloudProvider != "aws". Requires the alloy IRSA role to have
+        # cloudwatch:GetMetricData + tag:GetResources + rds:Describe* perms
+        # (granted in terraform/aws/eks/observability.tf). Off by default
+        # here; the AWS umbrella (helm/aws-infrastructure) flips it on.
+        cloudwatchRds:
+            enabled: false
+            # -- AWS region to query. Empty inherits aws.region.
+            region: ""
+            scrapeInterval: 1m
+            # -- Cadence of the YACE tag-discovery refresh that lists
+            # matching RDS instances. 5m matches the YACE default.
+            discoveryInterval: 5m
+            # -- Regex applied to the RDS `Name` tag. The Crossplane
+            # composition tags every Liferay-managed instance as
+            # "{baseName}-database-(blue|green)", so this captures the
+            # Liferay fleet without scraping unrelated RDS in the account.
+            # Note: if the composition naming convention changes, this
+            # filter silently stops matching.
+            nameTagRegex: ".*-database-(blue|green)$"
+            # -- (metric, statistics) pairs. Each pair is one
+            # GetMetricData query per instance per scrape — keep tight.
+            metrics:
+                -   name: CPUUtilization
+                    statistics: [Average, Maximum]
+                -   name: DatabaseConnections
+                    statistics: [Average, Maximum]
+                -   name: FreeableMemory
+                    statistics: [Average, Minimum]
+                -   name: FreeStorageSpace
+                    statistics: [Average, Minimum]
+                -   name: ReadIOPS
+                    statistics: [Average]
+                -   name: WriteIOPS
+                    statistics: [Average]
+                -   name: ReadLatency
+                    statistics: [Average, Maximum]
+                -   name: WriteLatency
+                    statistics: [Average, Maximum]
+                -   name: SwapUsage
+                    statistics: [Average, Maximum]
+                -   name: DiskQueueDepth
+                    statistics: [Average, Maximum]
+                -   name: ReplicaLag
+                    statistics: [Average, Maximum]
     # -- Remote-write destination. Cloud-specific blocks are auto-generated:
     #   cloudProvider=aws  -> sigv4 against aws.ampWorkspaceUrl
     #   cloudProvider=gcp  -> bearer-token against gcp GMP write endpoint
@@ -180,6 +226,14 @@ grafana-alloy:
     # Must match alloy.namespace above.
     namespaceOverride: observability
     alloy:
+        # -- Required by alloy.scrape.cloudwatchRds: clustering shards
+        # the cloudwatch exporter target deterministically across the
+        # DaemonSet via `discovery.distribute`, so exactly one pod
+        # scrapes (otherwise every node would issue GetMetricData
+        # calls — N× CloudWatch billing). Other scrapes are unaffected
+        # unless wrapped in `discovery.distribute`.
+        clustering:
+            enabled: true
         configMap:
             create: false
             key: config.alloy
