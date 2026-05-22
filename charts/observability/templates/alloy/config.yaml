@@ -271,9 +271,9 @@ data:
           discovery {
             type    = "AWS/RDS"
             regions = [{{ $cwRegion | quote }}]
-            search_tags = [
-              { key = "Name", value = {{ $cw.nameTagRegex | quote }} },
-            ]
+            search_tags = {
+              Name = {{ $cw.nameTagRegex | quote }},
+            }
             {{- range $cw.metrics }}
             metric {
               name       = {{ .name | quote }}
