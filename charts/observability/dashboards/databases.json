@@ -228,7 +228,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg by (db_name, state) (\n  avg by (metadata_system_name, db_name, state) (\n    label_replace(\n      last_over_time(\n        cloudsql_googleapis_com:database_instance_state{\n          metadata_user_environment_id=\"$environment\"\n        }[${__interval}]\n      ) > 0,\n      \"db_name\", \"$1\", \"metadata_system_name\", \".*-db-(.*)\"\n    )\n  )\n)",
+          "expr": "avg by (database_id, data_plane, state) (\n  last_over_time(\n    liferay:db_instance_state{environment_id=\"$environment\"}[${__interval}]\n  ) > 0\n)",
           "format": "time_series",
           "instant": false,
           "legendFormat": "{{db_name}} - {{state}}",
@@ -361,7 +361,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  avg_over_time(\n    cloudsql_googleapis_com:database_disk_quota{\n      metadata_user_environment_id=\"$environment\"\n    }[${__interval}]\n  )\n)",
+          "expr": "avg(\n  avg_over_time(\n    liferay:db_disk_total_bytes{environment_id=\"$environment\"}[${__interval}]\n  )\n)",
           "format": "time_series",
           "instant": false,
           "legendFormat": "Capacity",
@@ -374,7 +374,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (metadata_system_name) (\n  avg_over_time(\n    cloudsql_googleapis_com:database_disk_bytes_used{\n      metadata_user_environment_id=\"$environment\"\n    }[${__interval}]\n  )\n)",
+          "expr": "avg by (database_id, data_plane) (\n  avg_over_time(\n    liferay:db_disk_used_bytes{environment_id=\"$environment\"}[${__interval}]\n  )\n)",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -506,7 +506,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  avg_over_time(\n    cloudsql_googleapis_com:database_memory_quota{\n      metadata_user_environment_id=\"$environment\"\n    }[${__interval}]\n  )\n)",
+          "expr": "avg(\n  avg_over_time(\n    liferay:db_memory_total_bytes{environment_id=\"$environment\"}[${__interval}]\n  )\n)",
           "format": "time_series",
           "instant": false,
           "legendFormat": "Capacity",
@@ -519,7 +519,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (metadata_system_name) (\n  avg_over_time(\n    cloudsql_googleapis_com:database_memory_usage{\n      metadata_user_environment_id=\"$environment\"\n    }[${__interval}]\n  )\n)",
+          "expr": "avg by (database_id, data_plane) (\n  avg_over_time(\n    liferay:db_memory_used_bytes{environment_id=\"$environment\"}[${__interval}]\n  )\n)",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -651,7 +651,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  avg_over_time(\n    cloudsql_googleapis_com:database_cpu_reserved_cores{\n      metadata_user_environment_id=\"$environment\"\n    }[${__interval}]\n  )\n)",
+          "expr": "avg(\n  avg_over_time(\n    liferay:db_cpu_reserved_cores{environment_id=\"$environment\"}[${__interval}]\n  )\n)",
           "format": "time_series",
           "instant": false,
           "legendFormat": "Capacity",
@@ -664,7 +664,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (metadata_system_name) (\n  rate(\n    cloudsql_googleapis_com:database_cpu_usage_time{\n      metadata_user_environment_id=\"$environment\"\n    }[${__rate_interval}]\n  )\n)",
+          "expr": "avg by (database_id, data_plane) (\n  avg_over_time(\n    liferay:db_cpu_used_cores{environment_id=\"$environment\"}[${__interval}]\n  )\n)",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,

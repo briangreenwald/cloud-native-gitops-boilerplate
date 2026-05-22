@@ -155,6 +155,15 @@ alloy:
                 component: liferay
             port: 12345
             path: /metrics
+        # -- Scrape the prometheus-rds-exporter Deployment for RDS
+        # describe-API gauges (memory_total, disk_total, instance_state)
+        # that CloudWatch doesn't publish. AWS-only; ignored when
+        # cloudProvider != "aws". Toggled in lockstep with
+        # rdsExporter.enabled below.
+        rdsExporter:
+            enabled: false
+            port: http
+            path: /metrics
         # -- AWS RDS CloudWatch metrics, scraped via Alloy's built-in
         # prometheus.exporter.cloudwatch (YACE-based). AWS-only; ignored when
         # cloudProvider != "aws". Requires the alloy IRSA role to have
@@ -215,6 +224,32 @@ alloy:
         bearerToken: ""
         headers: {}
         externalLabels: {}
+
+# -- prometheus-rds-exporter (AWS-only). Adds RDS describe-API gauges
+# (rds_instance_memory_bytes, rds_allocated_storage_bytes,
+# rds_max_allocated_storage_bytes, rds_status, rds_instance_vcpu_average)
+# that complement the CloudWatch metrics scraped by Alloy. Together they
+# back the `liferay:db_*` recording rules. Ignored when cloudProvider != aws.
+rdsExporter:
+    enabled: false
+    image:
+        repository: public.ecr.aws/qonto/prometheus-rds-exporter
+        tag: "0.13.0"
+    # -- IRSA role granting rds:Describe*, rds:ListTagsForResource,
+    # cloudwatch:GetMetricData. Set by the AWS umbrella from terraform's
+    # rds_exporter_role output. Distinct from the Alloy IRSA role so the
+    # exporter can be removed without touching Alloy's permission surface.
+    iam:
+        awsRoleArn: ""
+    # -- AWS region to query. Empty inherits aws.region.
+    region: ""
+    resources:
+        limits:
+            cpu: 100m
+            memory: 128Mi
+        requests:
+            cpu: 25m
+            memory: 64Mi
 
 # -- Subchart pass-through for the aliased grafana alloy chart. The chart
 # owns the SA and ConfigMap; the subchart only renders the DaemonSet + RBAC.
@@ -346,6 +381,273 @@ alerting:
                 /
                 sum by (container, namespace, pod) (
                     kube_pod_container_resource_limits{resource="memory"}
+                )
+        # -- AWS internal helper: per-instance environment/project tags
+        # joinable on dbinstance_identifier. Value=1 so it acts as a label
+        # carrier in group_left joins from user-facing rules below.
+        rds-meta-aws:
+            cloudProvider: aws
+            record: liferay:_rds_meta
+            expr: |
+                group by (dbinstance_identifier, tag_EnvironmentId, tag_ProjectId) (
+                    label_replace(aws_rds_info, "dbinstance_identifier", "$1", "tag_Name", "(.+)")
+                )
+        # -- Unified database metrics across clouds: liferay:db_*. Each
+        # entry below has an aws/gcp variant; only the one matching
+        # .Values.cloudProvider renders. Output labels: environment_id,
+        # project_id (AWS only), database_id, data_plane (AWS only), engine.
+        db-instance-state-aws:
+            cloudProvider: aws
+            record: liferay:db_instance_state
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine, state) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            label_replace(
+                              label_replace(
+                                label_replace(
+                                  label_replace(
+                                    label_replace(rds_status{job="prometheus-rds-exporter"} == 1, "state", "RUNNABLE", "status", "(.+)"),
+                                    "state", "RUNNING", "status", "available"),
+                                  "state", "FAILED", "status", "(failed|incompatible-.*|inaccessible-.*)"),
+                                "state", "MAINTENANCE", "status", "(backing-up|configuring-.*|maintenance|modifying|moving-to-vpc|rebooting|renaming|resetting-master-credentials|storage-optimization|upgrading)"),
+                              "state", "PENDING_CREATE", "status", "creating"),
+                            "state", "SUSPENDED", "status", "(starting|stopped|stopping)")
+                        * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                        "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                      "project_id", "$1", "tag_ProjectId", "(.+)"),
+                    "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$")
+                    , "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$"
+                )
+        db-instance-state-gcp:
+            cloudProvider: gcp
+            record: liferay:db_instance_state
+            expr: |
+                sum by (environment_id, database_id, state) (
+                    label_replace(
+                      label_replace(
+                        last_over_time(cloudsql_googleapis_com:database_instance_state[5m]) > 0,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-cpu-utilization-percent-aws:
+            cloudProvider: aws
+            record: liferay:db_cpu_utilization_percent
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            label_replace(
+                              aws_rds_cpuutilization_average{job="cloudwatch-rds"}
+                              * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                              "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                            "project_id", "$1", "tag_ProjectId", "(.+)"),
+                          "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                        "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$"),
+                      "engine", "$1", "dimension_EngineName", "(.+)")
+                )
+        db-cpu-utilization-percent-gcp:
+            cloudProvider: gcp
+            record: liferay:db_cpu_utilization_percent
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        rate(cloudsql_googleapis_com:database_cpu_usage_time[5m])
+                        /
+                        on(metadata_user_environment_id, metadata_system_name, db_name)
+                        cloudsql_googleapis_com:database_cpu_reserved_cores
+                        * 100,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-cpu-reserved-cores-aws:
+            cloudProvider: aws
+            record: liferay:db_cpu_reserved_cores
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            rds_instance_vcpu_average{job="prometheus-rds-exporter"}
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
+                )
+        db-cpu-reserved-cores-gcp:
+            cloudProvider: gcp
+            record: liferay:db_cpu_reserved_cores
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        cloudsql_googleapis_com:database_cpu_reserved_cores,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-cpu-used-cores-aws:
+            cloudProvider: aws
+            record: liferay:db_cpu_used_cores
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            (aws_rds_cpuutilization_average{job="cloudwatch-rds"} / 100)
+                            * on(dbinstance_identifier) rds_instance_vcpu_average{job="prometheus-rds-exporter"}
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
+                )
+        db-cpu-used-cores-gcp:
+            cloudProvider: gcp
+            record: liferay:db_cpu_used_cores
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        rate(cloudsql_googleapis_com:database_cpu_usage_time[5m]),
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-memory-used-bytes-aws:
+            cloudProvider: aws
+            record: liferay:db_memory_used_bytes
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            (rds_instance_memory_bytes{job="prometheus-rds-exporter"}
+                             - on(dbinstance_identifier) aws_rds_freeable_memory_average{job="cloudwatch-rds"})
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
+                )
+        db-memory-used-bytes-gcp:
+            cloudProvider: gcp
+            record: liferay:db_memory_used_bytes
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        cloudsql_googleapis_com:database_memory_usage,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-memory-total-bytes-aws:
+            cloudProvider: aws
+            record: liferay:db_memory_total_bytes
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            rds_instance_memory_bytes{job="prometheus-rds-exporter"}
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
+                )
+        db-memory-total-bytes-gcp:
+            cloudProvider: gcp
+            record: liferay:db_memory_total_bytes
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        cloudsql_googleapis_com:database_memory_quota,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-disk-used-bytes-aws:
+            cloudProvider: aws
+            record: liferay:db_disk_used_bytes
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            (rds_allocated_storage_bytes{job="prometheus-rds-exporter"}
+                             - on(dbinstance_identifier) aws_rds_free_storage_space_average{job="cloudwatch-rds"})
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
+                )
+        db-disk-used-bytes-gcp:
+            cloudProvider: gcp
+            record: liferay:db_disk_used_bytes
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        cloudsql_googleapis_com:database_disk_bytes_used,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        db-disk-total-bytes-aws:
+            cloudProvider: aws
+            record: liferay:db_disk_total_bytes
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            (rds_max_allocated_storage_bytes{job="prometheus-rds-exporter"}
+                             or rds_allocated_storage_bytes{job="prometheus-rds-exporter"})
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
+                )
+        db-disk-total-bytes-gcp:
+            cloudProvider: gcp
+            record: liferay:db_disk_total_bytes
+            expr: |
+                sum by (environment_id, database_id) (
+                    label_replace(
+                      label_replace(
+                        cloudsql_googleapis_com:database_disk_quota,
+                        "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
+                      "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
+                )
+        # -- AWS only: CloudSQL doesn't expose connection counts via the
+        # google-managed prometheus exporter. GCP panels render no data.
+        db-connections-aws:
+            cloudProvider: aws
+            record: liferay:db_connections
+            expr: |
+                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                    label_replace(
+                      label_replace(
+                        label_replace(
+                          label_replace(
+                            aws_rds_database_connections_average{job="cloudwatch-rds"}
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
                 )
     # -- The receiver that catches everything that doesn't match a route below.
     # Must reference a key in `notificationChannels`. Required when alerting is

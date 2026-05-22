@@ -261,6 +261,48 @@ data:
         }
         {{- end }}
 
+        {{- if and (eq $cloud "aws") .Values.alloy.scrape.rdsExporter.enabled }}
+
+        discovery.kubernetes "rds_exporter" {
+          role = "service"
+          selectors {
+            role  = "service"
+            label = "app.kubernetes.io/name=liferay-rds-exporter"
+          }
+        }
+
+        discovery.relabel "rds_exporter" {
+          targets = discovery.kubernetes.rds_exporter.targets
+          rule {
+            action         = "keep"
+            regex          = "{{ .Values.alloy.scrape.rdsExporter.port }}"
+            source_labels  = ["__meta_kubernetes_service_port_name"]
+          }
+          rule {
+            target_label = "__metrics_path__"
+            replacement  = {{ .Values.alloy.scrape.rdsExporter.path | quote }}
+          }
+          rule {
+            target_label = "job"
+            replacement  = "prometheus-rds-exporter"
+          }
+        }
+
+        prometheus.scrape "rds_exporter" {
+          targets         = discovery.relabel.rds_exporter.output
+          forward_to      = [prometheus.relabel.rds_exporter.receiver]
+          scrape_interval = {{ $interval | quote }}
+        }
+
+        prometheus.relabel "rds_exporter" {
+          forward_to = [prometheus.remote_write.default.receiver]
+          rule {
+            source_labels = ["dbidentifier"]
+            target_label  = "dbinstance_identifier"
+          }
+        }
+        {{- end }}
+
         {{- if and (eq $cloud "aws") .Values.alloy.scrape.cloudwatchRds.enabled }}
         {{- $cw := .Values.alloy.scrape.cloudwatchRds -}}
         {{- $cwRegion := default .Values.aws.region $cw.region }}
@@ -295,18 +337,22 @@ data:
             target_label = "job"
             replacement  = "cloudwatch-rds"
           }
-          rule {
-            source_labels = ["dimension_DBInstanceIdentifier"]
-            target_label  = "dbinstance_identifier"
-          }
         }
 
         prometheus.scrape "cloudwatch_rds" {
           targets         = discovery.relabel.cloudwatch_rds.output
-          forward_to      = [prometheus.remote_write.default.receiver]
+          forward_to      = [prometheus.relabel.cloudwatch_rds.receiver]
           scrape_interval = {{ $cw.scrapeInterval | quote }}
           clustering {
             enabled = true
+          }
+        }
+
+        prometheus.relabel "cloudwatch_rds" {
+          forward_to = [prometheus.remote_write.default.receiver]
+          rule {
+            source_labels = ["dimension_DBInstanceIdentifier"]
+            target_label  = "dbinstance_identifier"
           }
         }
         {{- end }}
