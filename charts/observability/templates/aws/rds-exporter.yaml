@@ -41,8 +41,10 @@ spec:
         spec:
             containers:
                 -   args:
-                        -   --collect-usages=false
+                        -   --collect-logs-size=false
+                        -   --collect-maintenances=false
                         -   --collect-quotas=false
+                        -   --collect-usages=false
                         -   --log-format=json
                     env:
                         -   name: AWS_REGION
