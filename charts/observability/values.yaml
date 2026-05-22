@@ -396,30 +396,27 @@ alerting:
         # entry below has an aws/gcp variant; only the one matching
         # .Values.cloudProvider renders. Output labels: environment_id,
         # project_id (AWS only), database_id, data_plane (AWS only), engine.
+        # -- Qonto's rds-exporter emits `rds_instance_status` as a simple
+        # gauge (1=available, 0 otherwise) without a status-name label, so
+        # the AWS rule maps the value to a single `state="RUNNING"` label
+        # when running. AWS RDS does not surface the full state vocabulary
+        # via DescribeDBInstances + this exporter; richer state mapping
+        # would require a different exporter.
         db-instance-state-aws:
             cloudProvider: aws
             record: liferay:db_instance_state
             expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine, state) (
+                sum by (environment_id, project_id, database_id, data_plane, state) (
                     label_replace(
                       label_replace(
                         label_replace(
                           label_replace(
-                            label_replace(
-                              label_replace(
-                                label_replace(
-                                  label_replace(
-                                    label_replace(rds_status{job="prometheus-rds-exporter"} == 1, "state", "RUNNABLE", "status", "(.+)"),
-                                    "state", "RUNNING", "status", "available"),
-                                  "state", "FAILED", "status", "(failed|incompatible-.*|inaccessible-.*)"),
-                                "state", "MAINTENANCE", "status", "(backing-up|configuring-.*|maintenance|modifying|moving-to-vpc|rebooting|renaming|resetting-master-credentials|storage-optimization|upgrading)"),
-                              "state", "PENDING_CREATE", "status", "creating"),
-                            "state", "SUSPENDED", "status", "(starting|stopped|stopping)")
-                        * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
-                        "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
-                      "project_id", "$1", "tag_ProjectId", "(.+)"),
-                    "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$")
-                    , "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$"
+                            label_replace(rds_instance_status{job="prometheus-rds-exporter"} == 1, "state", "RUNNING", "dbinstance_identifier", ".*")
+                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
+                          "project_id", "$1", "tag_ProjectId", "(.+)"),
+                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
+                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
                 )
         db-instance-state-gcp:
             cloudProvider: gcp
@@ -612,8 +609,7 @@ alerting:
                       label_replace(
                         label_replace(
                           label_replace(
-                            (rds_max_allocated_storage_bytes{job="prometheus-rds-exporter"}
-                             or rds_allocated_storage_bytes{job="prometheus-rds-exporter"})
+                            rds_allocated_storage_bytes{job="prometheus-rds-exporter"}
                             * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
