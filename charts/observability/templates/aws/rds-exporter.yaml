@@ -41,15 +41,16 @@ spec:
         spec:
             containers:
                 -   args:
-                        -   --aws.region={{ $awsRegion }}
-                        -   --collector.usage=false
-                        -   --collector.quotas=false
-                        -   --log.format=json
-                        -   --log.level=info
+                        -   --collect-usages=false
+                        -   --collect-quotas=false
+                        -   --log-format=json
+                    env:
+                        -   name: AWS_REGION
+                            value: {{ $awsRegion | quote }}
                     image: {{ printf "%s:%s" .Values.rdsExporter.image.repository .Values.rdsExporter.image.tag | quote }}
                     livenessProbe:
                         httpGet:
-                            path: /healthz
+                            path: /metrics
                             port: metrics
                     name: exporter
                     ports:
@@ -57,7 +58,7 @@ spec:
                             name: metrics
                     readinessProbe:
                         httpGet:
-                            path: /healthz
+                            path: /metrics
                             port: metrics
                     resources:
                         {{- toYaml .Values.rdsExporter.resources | nindent 24 }}
