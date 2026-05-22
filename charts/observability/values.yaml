@@ -382,16 +382,37 @@ alerting:
                 sum by (container, namespace, pod) (
                     kube_pod_container_resource_limits{resource="memory"}
                 )
-        # -- AWS internal helper: per-instance environment/project tags
-        # joinable on dbinstance_identifier. Value=1 so it acts as a label
-        # carrier in group_left joins from user-facing rules below.
+        # -- AWS internal helper: bridges aws_rds_info (tag_EnvironmentId,
+        # tag_ProjectId) with rds_instance_info (instance_class) so every
+        # downstream rule can join on dbinstance_identifier and pick up
+        # both tag tags and instance_class. Value=1 per instance.
         rds-meta-aws:
             cloudProvider: aws
             record: liferay:_rds_meta
             expr: |
-                group by (dbinstance_identifier, tag_EnvironmentId, tag_ProjectId) (
-                    label_replace(aws_rds_info, "dbinstance_identifier", "$1", "tag_Name", "(.+)")
+                group by (dbinstance_identifier, tag_EnvironmentId, tag_ProjectId, instance_class) (
+                    (label_replace(aws_rds_info, "dbinstance_identifier", "$1", "tag_Name", "(.+)") + 1)
+                    * on(dbinstance_identifier) group_left(instance_class)
+                    rds_instance_info{job="prometheus-rds-exporter"}
                 )
+        # -- AWS internal helper: per-instance memory total bytes. Joins
+        # the per-class rds_instance_memory_bytes against _rds_meta on
+        # instance_class to produce one series per RDS instance.
+        rds-memory-bytes-aws:
+            cloudProvider: aws
+            record: liferay:_rds_memory_bytes
+            expr: |
+                rds_instance_memory_bytes{job="prometheus-rds-exporter"}
+                * on(instance_class) group_right
+                liferay:_rds_meta
+        # -- AWS internal helper: per-instance vCPU count.
+        rds-vcpu-avg-aws:
+            cloudProvider: aws
+            record: liferay:_rds_vcpu
+            expr: |
+                rds_instance_vcpu_average{job="prometheus-rds-exporter"}
+                * on(instance_class) group_right
+                liferay:_rds_meta
         # -- Unified database metrics across clouds: liferay:db_*. Each
         # entry below has an aws/gcp variant; only the one matching
         # .Values.cloudProvider renders. Output labels: environment_id,
@@ -466,13 +487,12 @@ alerting:
             cloudProvider: aws
             record: liferay:db_cpu_reserved_cores
             expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                sum by (environment_id, project_id, database_id, data_plane) (
                     label_replace(
                       label_replace(
                         label_replace(
                           label_replace(
-                            rds_instance_vcpu_average{job="prometheus-rds-exporter"}
-                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            liferay:_rds_vcpu,
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
                         "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
@@ -493,14 +513,14 @@ alerting:
             cloudProvider: aws
             record: liferay:db_cpu_used_cores
             expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                sum by (environment_id, project_id, database_id, data_plane) (
                     label_replace(
                       label_replace(
                         label_replace(
                           label_replace(
-                            (aws_rds_cpuutilization_average{job="cloudwatch-rds"} / 100)
-                            * on(dbinstance_identifier) rds_instance_vcpu_average{job="prometheus-rds-exporter"}
-                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            liferay:_rds_vcpu
+                            * on(dbinstance_identifier)
+                            (aws_rds_cpuutilization_average{job="cloudwatch-rds"} / 100),
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
                         "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
@@ -521,14 +541,14 @@ alerting:
             cloudProvider: aws
             record: liferay:db_memory_used_bytes
             expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                sum by (environment_id, project_id, database_id, data_plane) (
                     label_replace(
                       label_replace(
                         label_replace(
                           label_replace(
-                            (rds_instance_memory_bytes{job="prometheus-rds-exporter"}
-                             - on(dbinstance_identifier) aws_rds_freeable_memory_average{job="cloudwatch-rds"})
-                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            liferay:_rds_memory_bytes
+                            - on(dbinstance_identifier)
+                            rds_freeable_memory_bytes{job="prometheus-rds-exporter"},
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
                         "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
@@ -549,13 +569,12 @@ alerting:
             cloudProvider: aws
             record: liferay:db_memory_total_bytes
             expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                sum by (environment_id, project_id, database_id, data_plane) (
                     label_replace(
                       label_replace(
                         label_replace(
                           label_replace(
-                            rds_instance_memory_bytes{job="prometheus-rds-exporter"}
-                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
+                            liferay:_rds_memory_bytes,
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
                         "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
