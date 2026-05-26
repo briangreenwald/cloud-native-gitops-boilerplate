@@ -155,6 +155,17 @@ alloy:
                 component: liferay
             port: 12345
             path: /metrics
+        # -- Scrape Envoy Gateway data-plane pods for the load-balancers
+        # dashboard. Pods are discovered by the
+        # app.kubernetes.io/managed-by=envoy-gateway label and the metric
+        # `namespace` label is rewritten to the owning Gateway's namespace
+        # (from the gateway.envoyproxy.io/owning-gateway-namespace pod
+        # label) so dashboard filters scoped to the workload namespace
+        # match.
+        envoy:
+            enabled: true
+            port: 19001
+            path: /stats/prometheus
         # -- Scrape the prometheus-rds-exporter Deployment for RDS
         # describe-API gauges (memory_total, disk_total, instance_state)
         # that CloudWatch doesn't publish. AWS-only; ignored when
@@ -189,8 +200,6 @@ alloy:
             # GetMetricData query per instance per scrape — keep tight.
             metrics:
                 -   name: CPUUtilization
-                    statistics: [Average, Maximum]
-                -   name: DatabaseConnections
                     statistics: [Average, Maximum]
                 -   name: FreeableMemory
                     statistics: [Average, Minimum]
@@ -519,8 +528,8 @@ alerting:
                         label_replace(
                           label_replace(
                             liferay:_rds_vcpu
-                            * on(dbinstance_identifier)
-                            (aws_rds_cpuutilization_average{job="cloudwatch-rds"} / 100),
+                            * on(dbinstance_identifier) group_left()
+                            (rds_cpu_usage_percent_average{job="prometheus-rds-exporter"} / 100),
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
                         "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
@@ -595,13 +604,13 @@ alerting:
             cloudProvider: aws
             record: liferay:db_disk_used_bytes
             expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine) (
+                sum by (environment_id, project_id, database_id, data_plane) (
                     label_replace(
                       label_replace(
                         label_replace(
                           label_replace(
                             (rds_allocated_storage_bytes{job="prometheus-rds-exporter"}
-                             - on(dbinstance_identifier) aws_rds_free_storage_space_average{job="cloudwatch-rds"})
+                             - on(dbinstance_identifier) rds_free_storage_bytes{job="prometheus-rds-exporter"})
                             * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
                             "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
                           "project_id", "$1", "tag_ProjectId", "(.+)"),
@@ -646,24 +655,6 @@ alerting:
                         "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
                       "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
                 )
-        # -- AWS only: CloudSQL doesn't expose connection counts via the
-        # google-managed prometheus exporter. GCP panels render no data.
-        db-connections-aws:
-            cloudProvider: aws
-            record: liferay:db_connections
-            expr: |
-                sum by (environment_id, project_id, database_id, data_plane, engine) (
-                    label_replace(
-                      label_replace(
-                        label_replace(
-                          label_replace(
-                            aws_rds_database_connections_average{job="cloudwatch-rds"}
-                            * on(dbinstance_identifier) group_left(tag_EnvironmentId, tag_ProjectId) liferay:_rds_meta,
-                            "environment_id", "$1", "tag_EnvironmentId", "(.+)"),
-                          "project_id", "$1", "tag_ProjectId", "(.+)"),
-                        "data_plane", "$1", "dbinstance_identifier", ".*-database-(blue|green)$"),
-                      "database_id", "$1", "dbinstance_identifier", "(.+?)-database-(?:blue|green)$")
-                )
     # -- The receiver that catches everything that doesn't match a route below.
     # Must reference a key in `notificationChannels`. Required when alerting is
     # rendered (i.e. when notificationChannels is non-empty).
@@ -690,8 +681,6 @@ dashboards:
             file: dashboards/kubernetes-workloads.json
         load-balancers:
             file: dashboards/load-balancers.json
-        secrets:
-            file: dashboards/secrets.json
 
 # -- Subchart configuration. Values under each subchart key are passed
 # through to the upstream chart with no transformation. See each subchart's

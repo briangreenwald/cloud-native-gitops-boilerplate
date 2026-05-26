@@ -261,6 +261,52 @@ data:
         }
         {{- end }}
 
+        {{- if .Values.alloy.scrape.envoy.enabled }}
+
+        discovery.kubernetes "envoy_pods" {
+          role = "pod"
+          selectors {
+            role  = "pod"
+            label = "app.kubernetes.io/managed-by=envoy-gateway"
+          }
+        }
+
+        discovery.relabel "envoy_pods" {
+          targets = discovery.kubernetes.envoy_pods.targets
+          rule {
+            source_labels = ["__meta_kubernetes_pod_ip"]
+            target_label  = "__address__"
+            replacement   = "$1:{{ .Values.alloy.scrape.envoy.port }}"
+          }
+          rule {
+            target_label = "__metrics_path__"
+            replacement  = {{ .Values.alloy.scrape.envoy.path | quote }}
+          }
+          rule {
+            target_label = "job"
+            replacement  = "envoy"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_gateway_envoyproxy_io_owning_gateway_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_gateway_envoyproxy_io_owning_gateway_name"]
+            target_label  = "gateway"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+        }
+
+        prometheus.scrape "envoy" {
+          targets         = discovery.relabel.envoy_pods.output
+          forward_to      = [prometheus.remote_write.default.receiver]
+          scrape_interval = {{ $interval | quote }}
+        }
+        {{- end }}
+
         {{- if and (eq $cloud "aws") .Values.alloy.scrape.rdsExporter.enabled }}
 
         discovery.kubernetes "rds_exporter" {
