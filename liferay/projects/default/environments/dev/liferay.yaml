@@ -1,3 +1,6 @@
 liferay-default:
     image:
         tag: 2025.q1.20-lts
+network:
+    enabled: true
+    endpointRef: https
