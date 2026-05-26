@@ -9,3 +9,6 @@ endpoints:
                     name: liferay-tls-self-signed
 observability:
     enabled: true
+search:
+    elasticsearch:
+        enabled: true
