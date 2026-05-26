@@ -1,2 +1,11 @@
+endpoints:
+    https:
+        port: 10443
+        protocol: HTTPS
+        tls:
+            mode: Terminate
+            certificateRefs:
+                -   kind: Secret
+                    name: liferay-tls-self-signed
 observability:
     enabled: true
