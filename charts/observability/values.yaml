@@ -1,135 +1,50 @@
-# -- Cloud provider this chart is being installed onto.
-# Must be set to one of: aws | gcp.
-# Switches the Grafana Prometheus datasource auth and the scrape-config CRDs.
 cloudProvider: ""
 
-# -- Custom labels merged onto every resource this chart renders.
 customLabels: {}
 
-# -- Optional override for the resource name prefix.
 fullnameOverride: ""
 nameOverride: ""
-# -- Namespace where the observability stack (grafana, alloy, KSM, pushgateway,
-# node-exporter, and the chart's own ConfigMaps/SAs) is deployed. Defaults
-# to "observability" so the stack lives in its own dedicated namespace rather
-# than the umbrella release's namespace. Must match observability_config.namespace
-# in terraform so the IRSA role trust policies resolve.
 namespaceOverride: observability
 
-# -- AWS-specific configuration. Required when cloudProvider=aws.
 aws:
-    # -- AWS region the AMP workspace lives in.
     region: ""
-    # -- AMP workspace URL. The full Prometheus query endpoint, e.g.
-    # https://aps-workspaces.<region>.amazonaws.com/workspaces/<workspace-id>
     ampWorkspaceUrl: ""
 
-# -- GCP-specific configuration. Required when cloudProvider=gcp.
 gcp:
-    # -- GCP project ID hosting the GMP workspace.
     projectId: ""
 
-# -- Central Hub dashboard configuration. The hub's left-hand panel renders
-# tiles that link out to external systems (the customer's Git repo, ArgoCD,
-# Argo Workflows). URLs are substituted into the dashboard JSON at chart-
-# render time. gitUrl is required; argocdUrl and argoWorkflowsUrl are
-# optional. When an optional URL is empty, its tile renders as a muted
-# "configure me" placeholder with text pointing the operator at this values
-# key.
 centralHub:
-    # -- Customer Git repository URL. Required when the central-hub dashboard
-    # is enabled. helm template/install fails fast if empty.
     gitUrl: ""
-    # -- ArgoCD URL. Optional. Tile renders as a placeholder when unset.
     argocdUrl: ""
-    # -- Argo Workflows URL. Optional. Tile renders as a placeholder when
-    # unset. Self-hosted uses Argo Workflows for backup/restore flows.
     argoWorkflowsUrl: ""
 
-# -- Datasource the universal dashboards and alert rules query against.
-# The UID is referenced from every dashboard JSON and every alert rule,
-# so do not change `uid` after installation unless you also update the
-# dashboards.
 datasource:
     name: Prometheus
     uid: managed-prometheus
-    # -- Grafana datasource type. Override only if pointing at a non-Prometheus
-    # backend; the dashboards expect PromQL.
     type: prometheus
 
-# -- Optional log backend. The chart ships a metrics-only "kubernetes-workloads"
-# dashboard plus, optionally, a separate "kubernetes-workload-logs" dashboard
-# whose panel queries match the configured backend.
-#
-# Supported backends:
-#   "cloud-logging" — GCP Cloud Logging via the googlecloud-logging-datasource
-#                     plugin. Requires that plugin to be installed; set
-#                     `grafana.plugins: [googlecloud-logging-datasource]` in
-#                     your values (observability-paas does this automatically).
-#   "cloudwatch"    — AWS CloudWatch Logs Insights via Grafana's built-in
-#                     cloudwatch datasource. No plugin install required. The
-#                     pod logs must already be shipped to CloudWatch (e.g. via
-#                     Fluent Bit, the CloudWatch Container Insights add-on, or
-#                     the AWS for Fluent Bit chart).
-#   ""              — log dashboards are not rendered. Default for self-hosted
-#                     installs that haven't wired up log aggregation yet.
 logs:
     backend: ""
     cloudLogging:
-        # -- Filter applied to the Cloud Logging datasource's log bucket scope.
-        # Matches the existing PaaS behaviour. Override per cluster if your
-        # log buckets follow a different naming scheme.
         logBucketFilter: ".*workspace"
     cloudwatch:
-        # -- AWS region the CloudWatch log groups live in. Required when
-        # backend=cloudwatch.
         region: ""
-        # -- Authentication chain. "default" uses the AWS SDK default chain
-        # (respects IRSA on EKS). Set to "keys" + accessKey/secretKey for
-        # static credentials; not recommended.
         authType: default
-        # -- IAM role to assume, if not using the pod's IRSA role directly.
         assumeRoleArn: ""
 
-# -- Search engine selection. Drives the "Search Metrics" row in
-# kubernetes-workloads and the "Search Logs" panels in the log dashboards. The
-# chart picks the namespace suffix (e.g. "$environment-elasticsearch") at
-# render time based on which gate is enabled. Set exactly one to true for
-# in-cluster ECK Elasticsearch or in-cluster OpenSearch deployments. When
-# both are false the search panels render with an empty suffix and show no
-# data — appropriate when search runs as a managed service (e.g. AWS Managed
-# OpenSearch), which is handled via separate CloudWatch panels.
 search:
     elasticsearch:
         enabled: false
     opensearch:
         enabled: false
 
-# -- Grafana Alloy is the unified scraper across all clouds. The chart owns
-# Alloy's ServiceAccount and ConfigMap; the alloy subchart consumes them via
-# static names (liferay-alloy / liferay-alloy-config). One Alloy install per
-# namespace.
 alloy:
     enabled: true
-    # -- Namespace where Alloy's ServiceAccount, ConfigMap, DaemonSet and
-    # Service are created. Defaults to "observability" so the stack shares
-    # one namespace. The IRSA trust policy references
-    # system:serviceaccount:<this>:liferay-alloy. Must match
-    # observability_config.namespace in terraform.
     namespace: observability
-    # -- Scrape interval applied to every prometheus.scrape block in the
-    # generated River config. Override per-target if needed.
     scrapeInterval: 1m
-    # -- IAM identity wiring. Populate the value matching your cloud:
-    #   aws  -> eks.amazonaws.com/role-arn annotation on Alloy's SA (IRSA).
-    #   gcp  -> iam.gke.io/gcp-service-account annotation (Workload Identity).
-    # The IAM role / GCP service account themselves live outside the chart
-    # (operator-provisioned via terraform / cloud-infrastructure tooling).
     iam:
         awsRoleArn: ""
         gcpServiceAccount: ""
-    # -- Scrape targets. Each renders a discovery + relabel + scrape block in
-    # the Alloy River config. Disable a target by setting enabled: false.
     scrape:
         kubeStateMetrics:
             enabled: true
@@ -147,57 +62,25 @@ alloy:
             port: http
             path: /metrics
         liferay:
-            # -- Scrape Liferay application pods (JMX-exposed Prometheus
-            # metrics on port 12345). Needed for the JVM panels in the
-            # databases / kubernetes-workloads dashboards.
             enabled: true
             matchLabels:
                 component: liferay
             port: 12345
             path: /metrics
-        # -- Scrape Envoy Gateway data-plane pods for the load-balancers
-        # dashboard. Pods are discovered by the
-        # app.kubernetes.io/managed-by=envoy-gateway label and the metric
-        # `namespace` label is rewritten to the owning Gateway's namespace
-        # (from the gateway.envoyproxy.io/owning-gateway-namespace pod
-        # label) so dashboard filters scoped to the workload namespace
-        # match.
         envoy:
             enabled: true
             port: 19001
             path: /stats/prometheus
-        # -- Scrape the prometheus-rds-exporter Deployment for RDS
-        # describe-API gauges (memory_total, disk_total, instance_state)
-        # that CloudWatch doesn't publish. AWS-only; ignored when
-        # cloudProvider != "aws". Toggled in lockstep with
-        # rdsExporter.enabled below.
         rdsExporter:
             enabled: false
             port: http
             path: /metrics
-        # -- AWS RDS CloudWatch metrics, scraped via Alloy's built-in
-        # prometheus.exporter.cloudwatch (YACE-based). AWS-only; ignored when
-        # cloudProvider != "aws". Requires the alloy IRSA role to have
-        # cloudwatch:GetMetricData + tag:GetResources + rds:Describe* perms
-        # (granted in terraform/aws/eks/observability.tf). Off by default
-        # here; the AWS umbrella (helm/aws-infrastructure) flips it on.
         cloudwatchRds:
             enabled: false
-            # -- AWS region to query. Empty inherits aws.region.
             region: ""
             scrapeInterval: 1m
-            # -- Cadence of the YACE tag-discovery refresh that lists
-            # matching RDS instances. 5m matches the YACE default.
             discoveryInterval: 5m
-            # -- Regex applied to the RDS `Name` tag. The Crossplane
-            # composition tags every Liferay-managed instance as
-            # "{baseName}-database-(blue|green)", so this captures the
-            # Liferay fleet without scraping unrelated RDS in the account.
-            # Note: if the composition naming convention changes, this
-            # filter silently stops matching.
             nameTagRegex: ".*-database-(blue|green)$"
-            # -- (metric, statistics) pairs. Each pair is one
-            # GetMetricData query per instance per scrape — keep tight.
             metrics:
                 -   name: CPUUtilization
                     statistics: [Average, Maximum]
@@ -219,12 +102,6 @@ alloy:
                     statistics: [Average, Maximum]
                 -   name: ReplicaLag
                     statistics: [Average, Maximum]
-    # -- Remote-write destination. Cloud-specific blocks are auto-generated:
-    #   cloudProvider=aws  -> sigv4 against aws.ampWorkspaceUrl
-    #   cloudProvider=gcp  -> bearer-token against gcp GMP write endpoint
-    #                          (Workload Identity provides the token)
-    #   cloudProvider=""   -> requires remoteWrite.url + one of basicAuth /
-    #                          bearerToken / none
     remoteWrite:
         url: ""
         basicAuth:
@@ -234,23 +111,13 @@ alloy:
         headers: {}
         externalLabels: {}
 
-# -- prometheus-rds-exporter (AWS-only). Adds RDS describe-API gauges
-# (rds_instance_memory_bytes, rds_allocated_storage_bytes,
-# rds_max_allocated_storage_bytes, rds_status, rds_instance_vcpu_average)
-# that complement the CloudWatch metrics scraped by Alloy. Together they
-# back the `liferay:db_*` recording rules. Ignored when cloudProvider != aws.
 rdsExporter:
     enabled: false
     image:
         repository: public.ecr.aws/qonto/prometheus-rds-exporter
         tag: "0.13.0"
-    # -- IRSA role granting rds:Describe*, rds:ListTagsForResource,
-    # cloudwatch:GetMetricData. Set by the AWS umbrella from terraform's
-    # rds_exporter_role output. Distinct from the Alloy IRSA role so the
-    # exporter can be removed without touching Alloy's permission surface.
     iam:
         awsRoleArn: ""
-    # -- AWS region to query. Empty inherits aws.region.
     region: ""
     resources:
         limits:
@@ -260,25 +127,9 @@ rdsExporter:
             cpu: 25m
             memory: 64Mi
 
-# -- Subchart pass-through for the aliased grafana alloy chart. The chart
-# owns the SA and ConfigMap; the subchart only renders the DaemonSet + RBAC.
-# Operator-relevant alloy.* values live above; this block is mostly
-# implementation detail.
 grafana-alloy:
-    # -- Routes the subchart's DaemonSet and Service to the observability
-    # namespace so they sit alongside the SA + ConfigMap our chart creates.
-    # Must match alloy.namespace above.
     namespaceOverride: observability
     alloy:
-        # -- Required by alloy.scrape.cloudwatchRds: the cloudwatch RDS
-        # scrape component uses `clustering { enabled = true }` so that
-        # exactly one DaemonSet pod forwards CloudWatch samples to AMP
-        # (otherwise every pod would push duplicate series). Note: each
-        # pod still runs its own exporter and independently queries
-        # CloudWatch — Alloy lacks a standalone target-distribution
-        # component (no `discovery.distribute`). Splitting Alloy into a
-        # single-replica Deployment for CloudWatch is the long-term fix
-        # if the metric list or RDS count grows enough to matter.
         clustering:
             enabled: true
         configMap:
@@ -314,14 +165,9 @@ grafana-alloy:
         create: false
         name: liferay-alloy
 
-# -- Universal alerting configuration. The PaaS overlay adds more rules on top.
 alerting:
-    # -- Default Grafana folder for the rules in this chart.
     folder: alerts
-    # -- Default group evaluation interval.
     interval: 1m
-    # -- Alert rules ship default-enabled. Set <name>.enabled=false to drop one.
-    # Each entry becomes one ConfigMap consumed by the Grafana alerting sidecar.
     rules:
         cpu-limit-utilization:
             title: "Container CPU Limit Utilization Above 80%"
@@ -368,8 +214,6 @@ alerting:
                 aggregation_period: 10m
                 type: critical
                 unit: state
-    # -- Recording rules normalize the per-container utilization math so the
-    # alert exprs above stay short. Always rendered (no enabled toggle).
     recordingRules:
         container-cpu-limit-utilization-ratio:
             record: liferay:container_cpu_limit_utilization:ratio
@@ -391,10 +235,6 @@ alerting:
                 sum by (container, namespace, pod) (
                     kube_pod_container_resource_limits{resource="memory"}
                 )
-        # -- AWS internal helper: bridges aws_rds_info (tag_EnvironmentId,
-        # tag_ProjectId) with rds_instance_info (instance_class) so every
-        # downstream rule can join on dbinstance_identifier and pick up
-        # both tag tags and instance_class. Value=1 per instance.
         rds-meta-aws:
             cloudProvider: aws
             record: liferay:_rds_meta
@@ -404,9 +244,6 @@ alerting:
                     * on(dbinstance_identifier) group_left(instance_class)
                     rds_instance_info{job="prometheus-rds-exporter"}
                 )
-        # -- AWS internal helper: per-instance memory total bytes. Joins
-        # the per-class rds_instance_memory_bytes against _rds_meta on
-        # instance_class to produce one series per RDS instance.
         rds-memory-bytes-aws:
             cloudProvider: aws
             record: liferay:_rds_memory_bytes
@@ -414,7 +251,6 @@ alerting:
                 rds_instance_memory_bytes{job="prometheus-rds-exporter"}
                 * on(instance_class) group_right
                 liferay:_rds_meta
-        # -- AWS internal helper: per-instance vCPU count.
         rds-vcpu-avg-aws:
             cloudProvider: aws
             record: liferay:_rds_vcpu
@@ -422,16 +258,6 @@ alerting:
                 rds_instance_vcpu_average{job="prometheus-rds-exporter"}
                 * on(instance_class) group_right
                 liferay:_rds_meta
-        # -- Unified database metrics across clouds: liferay:db_*. Each
-        # entry below has an aws/gcp variant; only the one matching
-        # .Values.cloudProvider renders. Output labels: environment_id,
-        # project_id (AWS only), database_id, data_plane (AWS only), engine.
-        # -- Qonto's rds-exporter emits `rds_instance_status` as a simple
-        # gauge (1=available, 0 otherwise) without a status-name label, so
-        # the AWS rule maps the value to a single `state="RUNNING"` label
-        # when running. AWS RDS does not surface the full state vocabulary
-        # via DescribeDBInstances + this exporter; richer state mapping
-        # would require a different exporter.
         db-instance-state-aws:
             cloudProvider: aws
             record: liferay:db_instance_state
@@ -655,17 +481,10 @@ alerting:
                         "environment_id", "$1", "metadata_user_environment_id", "(.+)"),
                       "database_id", "$1", "metadata_system_name", ".*-db-(.*)")
                 )
-    # -- The receiver that catches everything that doesn't match a route below.
-    # Must reference a key in `notificationChannels`. Required when alerting is
-    # rendered (i.e. when notificationChannels is non-empty).
     defaultChannel: ""
-    # -- Notification routing. Empty by default so self-hosted operators can
-    # plug in their own email/Slack/etc. without inheriting the PaaS defaults.
     notificationChannels: {}
     templates: {}
 
-# -- Dashboard files shipped by this chart. Each entry becomes one ConfigMap
-# the Grafana sidecar picks up. `file` is relative to the chart root.
 dashboards:
     folder: Liferay
     items:
@@ -682,13 +501,8 @@ dashboards:
         load-balancers:
             file: dashboards/load-balancers.json
 
-# -- Subchart configuration. Values under each subchart key are passed
-# through to the upstream chart with no transformation. See each subchart's
-# values.yaml for the full schema.
 grafana:
     enabled: true
-    # -- Routes grafana into the observability namespace alongside the rest
-    # of the stack. Must match the top-level namespaceOverride.
     namespaceOverride: observability
     podAnnotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
@@ -704,16 +518,10 @@ grafana:
     serviceMonitor:
         enabled: false
     serviceAccount:
-        # -- The eks.amazonaws.com/role-arn annotation is populated by the
-        # ArgoCD ApplicationSet from terraform's grafana_role; leave empty
-        # here so chart consumers without AWS don't render a broken SA.
         annotations:
             eks.amazonaws.com/role-arn: ""
         automountServiceAccountToken: true
         name: grafana
-    # -- Datasources are not provisioned here; the chart renders a
-    # cloud-specific ConfigMap that the Grafana datasources sidecar picks up.
-    # Setting datasources: {} here keeps the subchart from creating its own.
     datasources: {}
     sidecar:
         logLevel: error
@@ -787,9 +595,6 @@ grafana:
             default_theme: light
     podDisruptionBudget:
         maxUnavailable: 1
-    # -- Network policy is disabled by default because the allowed CIDR ranges
-    # are cloud-specific (GCP health check IPs vs AWS NLB ranges). Operators
-    # enable and configure this on their own clusters.
     networkPolicy:
         enabled: false
 
@@ -800,8 +605,6 @@ kube-state-metrics:
         enabled: true
         egress:
             -   {}
-        # -- Default ingress allows traffic from any pod in the same namespace.
-        # Override per cluster to restrict to your Prometheus collector pods.
         ingress:
             -   from:
                     -   podSelector: {}
@@ -809,24 +612,19 @@ kube-state-metrics:
         maxUnavailable: 1
     resources:
         limits:
-            cpu: 30m
-            memory: 64Mi
+            cpu: 100m
+            memory: 256Mi
         requests:
-            cpu: 10m
-            memory: 32Mi
+            cpu: 30m
+            memory: 128Mi
     prometheusScrape: false
     prometheus:
         monitor:
             enabled: false
-    # -- Expose the liferay.com/observable namespace label on
-    # kube_namespace_labels so dashboards can filter customer environments.
     metricLabelsAllowlist:
         -   "namespaces=[liferay.com/observable]"
     extraArgs:
         -   --v=1
-        # -- Expand the metric allowlist to include resource-limits and
-        # resource-requests, which the universal alert rules need to compute
-        # utilization ratios.
         -   --metric-allowlist=kube_deployment_status_replicas_ready,kube_statefulset_status_replicas_ready,kube_pod_container_status_restarts_total,kube_pod_container_resource_limits,kube_pod_container_resource_requests,kube_pod_container_info,kube_namespace_labels,kube_node_info,kube_node_status_condition
     serviceAccount:
         automountServiceAccountToken: false
@@ -844,8 +642,6 @@ prometheus-node-exporter:
             enabled: false
         podMonitor:
             enabled: false
-    # -- NFS-mounted disks on GKE may require root group access. Override per
-    # cluster if your storage classes do not need this.
     securityContext:
         fsGroup: 0
     service:

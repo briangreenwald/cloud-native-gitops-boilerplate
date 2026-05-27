@@ -5,10 +5,6 @@
 {{- $pgName := index .Values "prometheus-pushgateway" "nameOverride" | default "prometheus-pushgateway" -}}
 {{- $interval := .Values.alloy.scrapeInterval -}}
 {{- $rw := .Values.alloy.remoteWrite -}}
-{{/*
-Validate remote-write configuration. AWS and GCP derive it automatically;
-self-hosted (no cloudProvider) must supply remoteWrite.url.
-*/}}
 {{- if and (ne $cloud "aws") (ne $cloud "gcp") (not $rw.url) -}}
 {{- fail "alloy.remoteWrite.url is required when cloudProvider is not aws or gcp" -}}
 {{- end -}}
@@ -41,9 +37,6 @@ data:
             }
             {{- range $k, $v := $rw.headers }}
             headers = { {{ $k | quote }} = {{ $v | quote }} }
-            {{- end }}
-            {{- with $rw.externalLabels }}
-            // external labels handled via the write_relabel_configs below
             {{- end }}
           }
         }

@@ -2,26 +2,34 @@
 {{- $datasourceUid := include "observability.datasourceUid" . -}}
 {{- $namespace := include "observability.namespace" . -}}
 {{- $items := deepCopy .Values.dashboards.items -}}
+{{- $region := "" -}}
+{{- with .Values.aws -}}
+{{- $region = (.region | default "") -}}
+{{- end -}}
 {{- $searchEngine := "" -}}
 {{- if .Values.search.elasticsearch.enabled -}}
 {{- $searchEngine = "elasticsearch" -}}
 {{- else if .Values.search.opensearch.enabled -}}
 {{- $searchEngine = "opensearch" -}}
 {{- end -}}
+{{- $logDashboardUid := "" -}}
 {{- if eq .Values.logs.backend "cloud-logging" -}}
 {{- $_ := set $items "kubernetes-workload-logs" (dict "file" "dashboards/logs/cloud-logging-kubernetes-logs.json") -}}
+{{- $logDashboardUid = "kubernetes-workload-logs-gcp" -}}
 {{- else if eq .Values.logs.backend "cloudwatch" -}}
 {{- $_ := set $items "kubernetes-workload-logs" (dict "file" "dashboards/logs/cloudwatch-kubernetes-logs.json") -}}
+{{- $logDashboardUid = "kubernetes-workload-logs-aws" -}}
 {{- end -}}
-{{/*
-Pre-compute the central-hub external-system tile substitutions. The hub HTML
-contains literal ${argocd_href}, ${argocd_description}, ${argocd_tile_style},
-${argo_workflows_href}, ${argo_workflows_description},
-${argo_workflows_tile_style} placeholders that we swap below. URL is required
-when the tile is "active"; when the URL value is empty the tile renders as a
-muted placeholder pointing the operator at the relevant values key.
-*/}}
-{{- $activeTileStyle := "background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; text-decoration: none; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;" -}}
+{{- $logDashboardLinks := "[]" -}}
+{{- if $logDashboardUid -}}
+{{- $logDashboardLinks = printf `[{"asDropdown":false,"icon":"external link","includeVars":true,"keepTime":true,"tags":[],"targetBlank":false,"title":"Kubernetes Workload Logs","tooltip":"View container logs for these workloads","type":"link","url":"/d/%s/%s"}]` $logDashboardUid $logDashboardUid -}}
+{{- end -}}
+{{- if eq .Values.cloudProvider "aws" -}}
+{{- if hasKey $items "backups" -}}
+{{- $_ := set (index $items "backups") "file" "dashboards/backups-aws.json" -}}
+{{- end -}}
+{{- end -}}
+{{- $activeTileStyle :="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; text-decoration: none; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;" -}}
 {{- $mutedTileStyle := "background-color: #f9fafb; border: 1px dashed #d1d5db; border-radius: 10px; padding: 16px; text-decoration: none; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; opacity: 0.65;" -}}
 {{- $argocdHref := "#" -}}
 {{- $argocdDescription := "Set centralHub.argocdUrl in your values.yaml to enable this link." -}}
@@ -39,24 +47,29 @@ muted placeholder pointing the operator at the relevant values key.
 {{- $argoWfDescription = "Workflow automation." -}}
 {{- $argoWfTileStyle = $activeTileStyle -}}
 {{- end -}}
+{{- $dashboardHeaders := dict
+    "load-balancers" (dict "title" "Load Balancer Metrics" "subtitle" "Traffic analysis and envoy health monitoring.")
+    "databases" (dict "title" "Database Health" "subtitle" "Database instance health and operational metrics.")
+    "backups" (dict "title" "Backups" "subtitle" "Backup history and status across the platform.")
+    "custom-domains" (dict "title" "Custom Domains" "subtitle" "Domain configuration and SSL status across the platform.")
+    "kubernetes-workloads" (dict "title" "Kubernetes Workloads" "subtitle" "Performance and resource metrics across pods.")
+-}}
 {{- range $key, $entry := $items }}
 {{- if not (eq $entry.enabled false) }}
 {{- $raw := $.Files.Get $entry.file -}}
 {{- if not $raw -}}
 {{- fail (printf "Dashboard file %s not found in chart" $entry.file) -}}
 {{- end -}}
-{{- $rendered := $raw | replace "${DS_PROMETHEUS}" $datasourceUid | replace "${SEARCH_ENGINE}" $searchEngine -}}
+{{- $rendered := $raw | replace "${DS_PROMETHEUS}" $datasourceUid | replace "${SEARCH_ENGINE}" $searchEngine | replace "${region}" $region | replace "${LOG_DASHBOARD_LINKS}" $logDashboardLinks -}}
+{{- if hasKey $dashboardHeaders $key -}}
+{{- $rendered = $rendered | replace "${HEADER_HTML}" (include "observability.dashboardHeaderJSON" (index $dashboardHeaders $key)) -}}
+{{- end -}}
 {{- if eq $key "central-hub" -}}
 {{- if not $.Values.centralHub.gitUrl -}}
 {{- fail "centralHub.gitUrl is required when the central-hub dashboard is enabled. Set it in your values.yaml or disable the dashboard via dashboards.items.central-hub.enabled: false." -}}
 {{- end -}}
-{{- $rendered = $rendered | replace "${git_url}" $.Values.centralHub.gitUrl -}}
-{{- $rendered = $rendered | replace "${argocd_href}" $argocdHref -}}
-{{- $rendered = $rendered | replace "${argocd_description}" $argocdDescription -}}
-{{- $rendered = $rendered | replace "${argocd_tile_style}" $argocdTileStyle -}}
-{{- $rendered = $rendered | replace "${argo_workflows_href}" $argoWfHref -}}
-{{- $rendered = $rendered | replace "${argo_workflows_description}" $argoWfDescription -}}
-{{- $rendered = $rendered | replace "${argo_workflows_tile_style}" $argoWfTileStyle -}}
+{{- $centralHubCtx := dict "gitUrl" $.Values.centralHub.gitUrl "argocdHref" $argocdHref "argocdDescription" $argocdDescription "argocdTileStyle" $argocdTileStyle "argoWfHref" $argoWfHref "argoWfDescription" $argoWfDescription "argoWfTileStyle" $argoWfTileStyle -}}
+{{- $rendered = $rendered | replace "${CENTRAL_HUB_HTML}" (include "observability.htmlToJSON" (include "observability.centralHubHTML" $centralHubCtx)) -}}
 {{- end }}
 ---
 apiVersion: v1

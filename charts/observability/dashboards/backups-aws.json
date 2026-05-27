@@ -1,0 +1,119 @@
+{
+	"annotations": {
+		"list": [
+			{
+				"builtIn": 1,
+				"datasource": {
+					"type": "grafana",
+					"uid": "-- Grafana --"
+				},
+				"enable": true,
+				"hide": true,
+				"iconColor": "rgba(0, 211, 255, 1)",
+				"name": "Annotations & Alerts",
+				"type": "dashboard"
+			}
+		]
+	},
+	"editable": true,
+	"fiscalYearStartMonth": 0,
+	"graphTooltip": 0,
+	"links": [],
+	"panels": [
+		{
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 5,
+				"w": 24,
+				"x": 0,
+				"y": 0
+			},
+			"id": 1,
+			"options": {
+				"code": {
+					"language": "plaintext",
+					"showLineNumbers": false,
+					"showMiniMap": false
+				},
+				"content": ${HEADER_HTML},
+				"mode": "html"
+			},
+			"pluginVersion": "12.4.2",
+			"title": "",
+			"transparent": true,
+			"type": "text"
+		},
+		{
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 14,
+				"w": 24,
+				"x": 0,
+				"y": 5
+			},
+			"id": 2,
+			"options": {
+				"code": {
+					"language": "plaintext",
+					"showLineNumbers": false,
+					"showMiniMap": false
+				},
+				"content": "<div style=\"padding: 32px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); box-sizing: border-box; width: 100%;\">\n\n  <div style=\"margin-bottom: 24px; border-left: 6px solid #ff9900; padding-left: 16px;\">\n    <h1 style=\"margin: 0; color: #111827; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;\">AWS Backup</h1>\n    <p style=\"margin: 4px 0 0 0; color: #4b5563; font-size: 14px; line-height: 1.5;\">On AWS, backups are managed by the native AWS Backup service. Recovery points, backup jobs, and restore history are tracked in the AWS Backup console rather than in Grafana.</p>\n  </div>\n\n  <div style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; width: 100%;\">\n\n    <a href=\"https://${region}.console.aws.amazon.com/backup/home?region=${region}#/dashboard\" target=\"_blank\" style=\"background-color: #ffffff; border: 2px solid #ff9900; border-radius: 10px; padding: 20px; text-decoration: none; display: flex; flex-direction: column; box-sizing: border-box;\">\n      <div style=\"margin-bottom: 8px; height: 28px; display: flex; align-items: center;\">\n        <span style=\"font-size: 24px;\">🗄️</span>\n      </div>\n      <div style=\"color: #111827; font-weight: 800; font-size: 16px; margin-bottom: 2px;\">AWS Backup Dashboard</div>\n      <div style=\"color: #6b7280; font-size: 12px; line-height: 1.3;\">Jobs, recovery points & status (${region}).</div>\n    </a>\n\n    <a href=\"https://${region}.console.aws.amazon.com/backup/home?region=${region}#/backupvaults\" target=\"_blank\" style=\"background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; text-decoration: none; display: flex; flex-direction: column; box-sizing: border-box;\">\n      <div style=\"margin-bottom: 8px; height: 28px; display: flex; align-items: center;\">\n        <span style=\"font-size: 24px;\">🔒</span>\n      </div>\n      <div style=\"color: #111827; font-weight: 800; font-size: 16px; margin-bottom: 2px;\">Backup Vaults</div>\n      <div style=\"color: #6b7280; font-size: 12px; line-height: 1.3;\">Stored recovery points by vault.</div>\n    </a>\n\n    <a href=\"https://${region}.console.aws.amazon.com/backup/home?region=${region}#/jobs\" target=\"_blank\" style=\"background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; text-decoration: none; display: flex; flex-direction: column; box-sizing: border-box;\">\n      <div style=\"margin-bottom: 8px; height: 28px; display: flex; align-items: center;\">\n        <span style=\"font-size: 24px;\">📋</span>\n      </div>\n      <div style=\"color: #111827; font-weight: 800; font-size: 16px; margin-bottom: 2px;\">Backup &amp; Restore Jobs</div>\n      <div style=\"color: #6b7280; font-size: 12px; line-height: 1.3;\">Recent job history & failures.</div>\n    </a>\n\n  </div>\n</div>",
+				"mode": "html"
+			},
+			"pluginVersion": "12.4.2",
+			"title": "",
+			"transparent": true,
+			"type": "text"
+		}
+	],
+	"preload": false,
+	"refresh": "",
+	"schemaVersion": 42,
+	"tags": [],
+	"templating": {
+		"list": [
+			{
+				"allowCustomValue": false,
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${DS_PROMETHEUS}"
+				},
+				"definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
+				"label": "Environment",
+				"name": "environment",
+				"options": [],
+				"query": {
+					"qryType": 1,
+					"query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
+					"refId": "PrometheusVariableQueryEditor-VariableQuery"
+				},
+				"refresh": 1,
+				"regex": "/(?<value>.*-(?<text>.*))/",
+				"regexApplyTo": "value",
+				"sort": 1,
+				"type": "query"
+			}
+		]
+	},
+	"time": {
+		"from": "now-6h",
+		"to": "now"
+	},
+	"timepicker": {},
+	"timezone": "browser",
+	"title": "Backups",
+	"uid": "backups",
+	"version": 1,
+	"weekStart": ""
+}

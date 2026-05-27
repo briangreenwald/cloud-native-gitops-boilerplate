@@ -1,230 +1,230 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "links": [
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Kubernetes Workloads (Metrics)",
-      "tooltip": "Back to the main Kubernetes Workloads dashboard",
-      "type": "link",
-      "url": "/d/kubernetes-workloads/kubernetes-workloads"
-    }
-  ],
-  "panels": [
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 100,
-      "panels": [],
-      "title": "Liferay Logs",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "googlecloud-logging-datasource",
-        "uid": "googlecloud-logging-datasource"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 1
-      },
-      "id": 4,
-      "options": {
-        "dedupStrategy": "exact",
-        "detailsMode": "inline",
-        "enableInfiniteScrolling": false,
-        "enableLogDetails": true,
-        "fontSize": "default",
-        "prettifyLogMessage": false,
-        "showControls": true,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "syntaxHighlighting": true,
-        "timestampResolution": "ms",
-        "unwrappedColumns": false,
-        "wrapLogMessage": false
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "bucketId": "us-west1/buckets/workspace",
-          "datasource": {
-            "type": "googlecloud-logging-datasource",
-            "uid": "googlecloud-logging-datasource"
-          },
-          "projectId": "liferaycloud-dev-cust-d1",
-          "queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment\"\nresource.labels.pod_name=~\"liferay-.*\"\n${Filters}",
-          "refId": "A",
-          "viewId": "_AllLogs"
-        },
-        {
-          "bucketId": "us-west1/buckets/workspace",
-          "datasource": {
-            "type": "googlecloud-logging-datasource",
-            "uid": "googlecloud-logging-datasource"
-          },
-          "projectId": "liferaycloud-dev-cust-d1",
-          "queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment\"\nresource.labels.pod_name=~\"liferay-.*\"\n$Filters",
-          "refId": "B",
-          "viewId": "_AllLogs"
-        }
-      ],
-      "title": "Liferay Logs",
-      "type": "logs"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 12
-      },
-      "id": 101,
-      "panels": [],
-      "title": "Search Logs",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "googlecloud-logging-datasource",
-        "uid": "googlecloud-logging-datasource"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 13
-      },
-      "id": 16,
-      "options": {
-        "dedupStrategy": "exact",
-        "detailsMode": "inline",
-        "enableInfiniteScrolling": false,
-        "enableLogDetails": true,
-        "fontSize": "default",
-        "prettifyLogMessage": false,
-        "showControls": true,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "syntaxHighlighting": true,
-        "timestampResolution": "ms",
-        "unwrappedColumns": false,
-        "wrapLogMessage": false
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "bucketId": "us-west1/buckets/workspace",
-          "datasource": {
-            "type": "googlecloud-logging-datasource",
-            "uid": "googlecloud-logging-datasource"
-          },
-          "projectId": "liferaycloud-dev-cust-d1",
-          "queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment-${SEARCH_ENGINE}\"\n$Filters",
-          "refId": "A",
-          "viewId": "_AllLogs"
-        }
-      ],
-      "title": "Search Logs",
-      "type": "logs"
-    }
-  ],
-  "preload": false,
-  "schemaVersion": 42,
-  "tags": [
-    "liferay",
-    "logs",
-    "gcp"
-  ],
-  "templating": {
-    "list": [
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
-        "label": "Environment",
-        "name": "environment",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "/(?<value>.*-(?<text>.*))/",
-        "regexApplyTo": "value",
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "baseFilters": [],
-        "datasource": {
-          "type": "googlecloud-logging-datasource",
-          "uid": "googlecloud-logging-datasource"
-        },
-        "description": "",
-        "filters": [],
-        "hide": 0,
-        "name": "Filters",
-        "type": "adhoc"
-      }
-    ]
-  },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "browser",
-  "title": "Kubernetes Workload Logs (GCP Cloud Logging)",
-  "uid": "kubernetes-workload-logs-gcp",
-  "version": 1,
-  "weekStart": ""
+	"annotations": {
+		"list": [
+			{
+				"builtIn": 1,
+				"datasource": {
+					"type": "grafana",
+					"uid": "-- Grafana --"
+				},
+				"enable": true,
+				"hide": true,
+				"iconColor": "rgba(0, 211, 255, 1)",
+				"name": "Annotations & Alerts",
+				"type": "dashboard"
+			}
+		]
+	},
+	"editable": true,
+	"fiscalYearStartMonth": 0,
+	"graphTooltip": 0,
+	"links": [
+		{
+			"asDropdown": false,
+			"icon": "external link",
+			"includeVars": true,
+			"keepTime": true,
+			"tags": [],
+			"targetBlank": false,
+			"title": "Kubernetes Workloads (Metrics)",
+			"tooltip": "Back to the main Kubernetes Workloads dashboard",
+			"type": "link",
+			"url": "/d/kubernetes-workloads/kubernetes-workloads"
+		}
+	],
+	"panels": [
+		{
+			"collapsed": false,
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 0
+			},
+			"id": 100,
+			"panels": [],
+			"title": "Liferay Logs",
+			"type": "row"
+		},
+		{
+			"datasource": {
+				"type": "googlecloud-logging-datasource",
+				"uid": "googlecloud-logging-datasource"
+			},
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 11,
+				"w": 24,
+				"x": 0,
+				"y": 1
+			},
+			"id": 4,
+			"options": {
+				"dedupStrategy": "exact",
+				"detailsMode": "inline",
+				"enableInfiniteScrolling": false,
+				"enableLogDetails": true,
+				"fontSize": "default",
+				"prettifyLogMessage": false,
+				"showControls": true,
+				"showLabels": false,
+				"showTime": true,
+				"sortOrder": "Descending",
+				"syntaxHighlighting": true,
+				"timestampResolution": "ms",
+				"unwrappedColumns": false,
+				"wrapLogMessage": false
+			},
+			"pluginVersion": "12.4.2",
+			"targets": [
+				{
+					"bucketId": "us-west1/buckets/workspace",
+					"datasource": {
+						"type": "googlecloud-logging-datasource",
+						"uid": "googlecloud-logging-datasource"
+					},
+					"projectId": "liferaycloud-dev-cust-d1",
+					"queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment\"\nresource.labels.pod_name=~\"liferay-.*\"\n${Filters}",
+					"refId": "A",
+					"viewId": "_AllLogs"
+				},
+				{
+					"bucketId": "us-west1/buckets/workspace",
+					"datasource": {
+						"type": "googlecloud-logging-datasource",
+						"uid": "googlecloud-logging-datasource"
+					},
+					"projectId": "liferaycloud-dev-cust-d1",
+					"queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment\"\nresource.labels.pod_name=~\"liferay-.*\"\n$Filters",
+					"refId": "B",
+					"viewId": "_AllLogs"
+				}
+			],
+			"title": "Liferay Logs",
+			"type": "logs"
+		},
+		{
+			"collapsed": false,
+			"gridPos": {
+				"h": 1,
+				"w": 24,
+				"x": 0,
+				"y": 12
+			},
+			"id": 101,
+			"panels": [],
+			"title": "Search Logs",
+			"type": "row"
+		},
+		{
+			"datasource": {
+				"type": "googlecloud-logging-datasource",
+				"uid": "googlecloud-logging-datasource"
+			},
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 11,
+				"w": 24,
+				"x": 0,
+				"y": 13
+			},
+			"id": 16,
+			"options": {
+				"dedupStrategy": "exact",
+				"detailsMode": "inline",
+				"enableInfiniteScrolling": false,
+				"enableLogDetails": true,
+				"fontSize": "default",
+				"prettifyLogMessage": false,
+				"showControls": true,
+				"showLabels": false,
+				"showTime": true,
+				"sortOrder": "Descending",
+				"syntaxHighlighting": true,
+				"timestampResolution": "ms",
+				"unwrappedColumns": false,
+				"wrapLogMessage": false
+			},
+			"pluginVersion": "12.4.2",
+			"targets": [
+				{
+					"bucketId": "us-west1/buckets/workspace",
+					"datasource": {
+						"type": "googlecloud-logging-datasource",
+						"uid": "googlecloud-logging-datasource"
+					},
+					"projectId": "liferaycloud-dev-cust-d1",
+					"queryText": "severity>=DEFAULT\nresource.type=\"k8s_container\"\nresource.labels.namespace_name=\"$environment-${SEARCH_ENGINE}\"\n$Filters",
+					"refId": "A",
+					"viewId": "_AllLogs"
+				}
+			],
+			"title": "Search Logs",
+			"type": "logs"
+		}
+	],
+	"preload": false,
+	"schemaVersion": 42,
+	"tags": [
+		"liferay",
+		"logs",
+		"gcp"
+	],
+	"templating": {
+		"list": [
+			{
+				"allowCustomValue": false,
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${DS_PROMETHEUS}"
+				},
+				"definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
+				"label": "Environment",
+				"name": "environment",
+				"options": [],
+				"query": {
+					"qryType": 1,
+					"query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},namespace)",
+					"refId": "PrometheusVariableQueryEditor-VariableQuery"
+				},
+				"refresh": 1,
+				"regex": "/(?<value>.*-(?<text>.*))/",
+				"regexApplyTo": "value",
+				"sort": 1,
+				"type": "query"
+			},
+			{
+				"baseFilters": [],
+				"datasource": {
+					"type": "googlecloud-logging-datasource",
+					"uid": "googlecloud-logging-datasource"
+				},
+				"description": "",
+				"filters": [],
+				"hide": 0,
+				"name": "Filters",
+				"type": "adhoc"
+			}
+		]
+	},
+	"time": {
+		"from": "now-1h",
+		"to": "now"
+	},
+	"timepicker": {},
+	"timezone": "browser",
+	"title": "Kubernetes Workload Logs (GCP Cloud Logging)",
+	"uid": "kubernetes-workload-logs-gcp",
+	"version": 1,
+	"weekStart": ""
 }
