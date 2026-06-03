@@ -24,27 +24,6 @@ endpoints: {}
 forceDestroy: false
 gateway: {}
 license: {}
-observability:
-    alloy:
-        iam:
-            awsRoleArn: ""
-        scrape:
-            cloudwatchRds:
-                enabled: true
-    aws:
-        ampWorkspaceUrl: ""
-        region: ""
-    centralHub:
-        argocdUrl: ""
-        argoWorkflowsUrl: ""
-        gitUrl: ""
-    cloudProvider: aws
-    enabled: false
-    search:
-        elasticsearch:
-            enabled: false
-        opensearch:
-            enabled: true
 orphanOnDelete: false
 overlay: {}
 search:

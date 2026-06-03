@@ -1,0 +1,5 @@
+search:
+    elasticsearch:
+        enabled: true
+    opensearch:
+        enabled: false

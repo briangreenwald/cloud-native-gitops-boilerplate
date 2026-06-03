@@ -1,10 +1,5 @@
 apiVersion: v2
 appVersion: latest
-dependencies:
-    -   condition: observability.enabled
-        name: observability
-        repository: file://../observability
-        version: 0.1.0
 description:
     Liferay is an all-in-one DXP, LCAP, and Commerce platform. This chart creates cloud infrastructure resources to support Liferay.
 icon: https://www-cdn.liferay.com/documents/d/guest/liferay-logo
