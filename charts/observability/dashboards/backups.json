@@ -42,7 +42,7 @@
 					"showMiniMap": false
 				},
 				"content": "${HEADER_HTML}",
-				"mode": "markdown"
+				"mode": "html"
 			},
 			"pluginVersion": "12.4.2",
 			"title": "",
