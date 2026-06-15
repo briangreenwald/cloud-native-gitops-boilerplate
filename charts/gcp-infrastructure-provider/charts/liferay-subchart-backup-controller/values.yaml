@@ -1,0 +1,11 @@
+cpuLimit: "1"
+cpuRequest: "1"
+env:
+    GOMEMLIMIT: 819MiB
+    LCP_ENABLE_DATABASE_DUMPS: false
+    LCP_ENABLE_DEPLOYMENT_MUTATION: false
+    LCP_ENABLE_SANDBOX_FILTER: false
+imageTag: 1.7.0
+memoryLimit: 1Gi
+memoryRequest: 1Gi
+replicas: 3
