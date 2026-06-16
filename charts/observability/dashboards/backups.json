@@ -318,7 +318,7 @@
 					"disableTextWrap": false,
 					"editorMode": "code",
 					"exemplar": false,
-					"expr": "count(\r\n  max by (name) (\r\n    max_over_time(\r\n      kube_customresource_liferay_backup_status_condition{reason=\"succeeded\", exported_namespace=\"$environment\"}[$__range]\r\n    )\r\n  )\r\n)",
+					"expr": "count(\n  max by (name) (\n    max_over_time(\n      kube_customresource_liferay_backup_status_condition{reason=\"succeeded\", exported_namespace=\"$environment\"}[$__range]\n    )\n  )\n)",
 					"format": "table",
 					"fullMetaSearch": false,
 					"includeNullMetadata": true,
@@ -329,7 +329,7 @@
 					"useBackend": false
 				}
 			],
-			"title": "SUCCESS RUNS #",
+			"title": "Successful Runs",
 			"type": "stat"
 		},
 		{
@@ -402,7 +402,7 @@
 					"disableTextWrap": false,
 					"editorMode": "code",
 					"exemplar": false,
-					"expr": "count(\r\n  max by (name) (\r\n    max_over_time(\r\n      kube_customresource_liferay_backup_status_condition{reason!~\"succeeded|initiated\", exported_namespace=\"$environment\"}[$__range]\r\n    )\r\n  )\r\n)",
+					"expr": "count(\n  max by (name) (\n    max_over_time(\n      kube_customresource_liferay_backup_status_condition{reason!~\"succeeded|initiated\", exported_namespace=\"$environment\"}[$__range]\n    )\n  )\n)",
 					"format": "table",
 					"fullMetaSearch": false,
 					"includeNullMetadata": true,
@@ -413,7 +413,7 @@
 					"useBackend": false
 				}
 			],
-			"title": "FAILED RUNS #",
+			"title": "Failed Runs",
 			"type": "stat"
 		},
 		{
@@ -486,7 +486,7 @@
 					"disableTextWrap": false,
 					"editorMode": "code",
 					"exemplar": false,
-					"expr": "count(\r\n  max by (name) (\r\n    max_over_time(\r\n      kube_customresource_liferay_backup_status_condition{reason!=\"initiated\", exported_namespace=\"$environment\"}[$__range]\r\n    )\r\n  )\r\n)",
+					"expr": "count(\n  max by (name) (\n    max_over_time(\n      kube_customresource_liferay_backup_status_condition{reason!=\"initiated\", exported_namespace=\"$environment\"}[$__range]\n    )\n  )\n)",
 					"format": "table",
 					"fullMetaSearch": false,
 					"includeNullMetadata": true,
@@ -497,7 +497,7 @@
 					"useBackend": false
 				}
 			],
-			"title": "TOTAL RUNS #",
+			"title": "Total Runs",
 			"type": "stat"
 		},
 		{
@@ -575,7 +575,7 @@
 					},
 					"editorMode": "code",
 					"exemplar": false,
-					"expr": "count(\r\n  max by (name) (\r\n    max_over_time(\r\n      kube_customresource_liferay_backup_status_condition{reason!~\"succeeded|initiated\", exported_namespace=\"$environment\"}[$__range]\r\n    )\r\n  )\r\n)\r\n/\r\ncount(\r\n  max by (name) (\r\n    max_over_time(\r\n      kube_customresource_liferay_backup_status_condition{reason!=\"initiated\", exported_namespace=\"$environment\"}[$__range]\r\n    )\r\n  )\r\n) * 100",
+					"expr": "count(\n  max by (name) (\n    max_over_time(\n      kube_customresource_liferay_backup_status_condition{reason!~\"succeeded|initiated\", exported_namespace=\"$environment\"}[$__range]\n    )\n  )\n)\n/\ncount(\n  max by (name) (\n    max_over_time(\n      kube_customresource_liferay_backup_status_condition{reason!=\"initiated\", exported_namespace=\"$environment\"}[$__range]\n    )\n  )\n) * 100",
 					"format": "table",
 					"instant": true,
 					"legendFormat": "__auto",
@@ -583,15 +583,15 @@
 					"refId": "A"
 				}
 			],
-			"title": "Build Failure Rate",
+			"title": "Backup Failure Rate",
 			"type": "gauge"
 		}
 	],
 	"preload": false,
 	"schemaVersion": 42,
 	"tags": [
-		"Liferay",
-		"Backups"
+		"Backups",
+		"Liferay"
 	],
 	"templating": {
 		"list": [

@@ -686,8 +686,8 @@
 	"preload": false,
 	"schemaVersion": 42,
 	"tags": [
-		"Liferay",
-		"Databases"
+		"Databases",
+		"Liferay"
 	],
 	"templating": {
 		"list": [
@@ -712,7 +712,7 @@
 					"refId": "PrometheusVariableQueryEditor-VariableQuery"
 				},
 				"refresh": 1,
-				"regex": "/.*-(?<value>(?<text>.*))/",
+				"regex": "/(?<value>.*-(?<text>.*))/",
 				"regexApplyTo": "value",
 				"sort": 1,
 				"type": "query"
