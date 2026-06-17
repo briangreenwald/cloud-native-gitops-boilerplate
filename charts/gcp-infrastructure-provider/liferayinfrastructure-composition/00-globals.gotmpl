@@ -50,4 +50,4 @@
 
 {{- $cmkKeyName := printf "projects/%s/locations/%s/keyRings/%s-keyring/cryptoKeys/%s-key" $env.projectId $region $baseName $baseName -}}
 
-{{- include "gcp-infrastructure-provider.overlayBucketName" . }}
+ {{- $overlayBucketName := printf "%s-overlay" $baseName -}}
