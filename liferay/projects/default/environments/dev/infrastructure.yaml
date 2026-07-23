@@ -7,6 +7,9 @@ endpoints:
             certificateRefs:
                 -   kind: Secret
                     name: liferay-tls-self-signed
+license:
+    externalSecretName: greenwald
+    targetSecretName: liferay-license
 search:
     elasticsearch:
         enabled: true
