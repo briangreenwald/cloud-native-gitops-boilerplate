@@ -1,4 +1,4 @@
 liferay-dxp-operator:
     image:
-        repository: us-central1-docker.pkg.dev/external-assets-nonprd/liferay-cloud-native/lcd-52956/liferay-dxp-operator
-        tag: 0.0.1-g995da08
+        repository: us-central1-docker.pkg.dev/external-assets-nonprd/liferay-cloud-native/lcd-52678-master-repro/liferay-dxp-operator
+        tag: 0.0.1-g79524af
