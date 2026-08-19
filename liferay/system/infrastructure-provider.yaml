@@ -2,3 +2,5 @@ liferay-dxp-operator:
     image:
         repository: us-central1-docker.pkg.dev/external-assets-nonprd/liferay-cloud-native/lcd-52678-master-repro/liferay-dxp-operator
         tag: 0.0.1-g79524af
+    provisioning:
+        baseURL: http://provisioning-mock.provisioning-mock.svc.cluster.local:8080
