@@ -1,7 +1,6 @@
 liferay-default:
     image:
         tag: 2025.q1.20-lts
-    replicaCount: 3
 network:
     enabled: true
     endpointRef: https
