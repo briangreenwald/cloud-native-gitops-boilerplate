@@ -11,7 +11,7 @@ endpoints:
                 -   kind: Secret
                     name: liferay-tls-self-signed
 license:
-    externalSecretName: greenwald
+    externalSecretKey: greenwald
     targetSecretName: liferay-license
 search:
     elasticsearch:
