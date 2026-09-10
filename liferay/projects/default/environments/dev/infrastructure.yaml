@@ -1,3 +1,6 @@
+backup:
+    enabled: true
+    retentionDays: 7
 endpoints:
     https:
         port: 10443
