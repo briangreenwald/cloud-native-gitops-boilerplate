@@ -1,6 +1,7 @@
 backup:
     enabled: true
     retentionDays: 7
+forceDestroy: true
 license:
     externalSecretKey: liferay-licenses-greenwald
     targetSecretName: liferay-license
