@@ -1,9 +1,8 @@
 liferay-default:
     image:
-        tag: 2025.q1.20-lts
+        tag: 2026.q1.8-lts
     licensing:
         enabled: true
-        secretName: liferay-license
 network:
     enabled: true
     endpointRef: https
