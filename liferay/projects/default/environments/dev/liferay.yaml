@@ -1,4 +1,8 @@
 liferay-default:
+    autoscaling:
+        enabled: true
+        keda:
+            maxReplicaCount: 2
     image:
         tag: 2026.q1.8-lts
     licensing:
