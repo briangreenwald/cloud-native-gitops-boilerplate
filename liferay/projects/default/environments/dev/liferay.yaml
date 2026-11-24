@@ -3,6 +3,8 @@ liferay-default:
         enabled: true
     overlay:
         copy:
+            -   from: LCD-53485-offline-bundle-delivery.md
+                into: liferay/data/release-check
             -   from: release-check/*
                 into: liferay/data/release-check
         enabled: true
