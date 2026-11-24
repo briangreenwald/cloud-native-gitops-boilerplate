@@ -1,0 +1,3 @@
+overlayBucket:
+    enabled: true
+    forceDestroy: true

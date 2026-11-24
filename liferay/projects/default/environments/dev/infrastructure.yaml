@@ -2,6 +2,8 @@ backup:
     enabled: true
     retentionDays: 7
 forceDestroy: true
+overlayAccess:
+    enabled: true
 search:
     elasticsearch:
         enabled: true
