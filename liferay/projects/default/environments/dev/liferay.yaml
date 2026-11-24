@@ -1,6 +1,11 @@
 liferay-default:
     licensing:
         enabled: true
+    overlay:
+        copy:
+            -   from: release-check/*
+                into: liferay/data/release-check
+        enabled: true
 network:
     enabled: true
     endpointRef: https
