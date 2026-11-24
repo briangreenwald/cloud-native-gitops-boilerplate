@@ -1,8 +1,4 @@
 liferay-default:
-    autoscaling:
-        enabled: true
-        keda:
-            maxReplicaCount: 2
     licensing:
         enabled: true
 network:
