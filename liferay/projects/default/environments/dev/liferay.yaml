@@ -1,12 +1,7 @@
 liferay-default:
+    image:
+        tag: 2026.q1.8-lts
     licensing:
-        enabled: true
-    overlay:
-        copy:
-            -   from: LCD-53485-offline-bundle-delivery.md
-                into: liferay/data/release-check
-            -   from: release-check/*
-                into: liferay/data/release-check
         enabled: true
 network:
     enabled: true
